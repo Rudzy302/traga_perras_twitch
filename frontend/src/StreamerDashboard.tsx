@@ -7,6 +7,7 @@ export interface TwitchStatusPayload {
   botUsername: string;
   oauthToken?: string;
   isAuthenticated: boolean;
+  authError?: string | null;
   isSpinActive: boolean;
   cooldownSeconds: number;
   pointsCommand?: string;
@@ -17,7 +18,10 @@ export interface TwitchStatusPayload {
 
 const LOCAL_STORAGE_KEY = 'casino_streamer_config_v1';
 
+export type DashboardTab = 'connect' | 'slot' | 'cooldown';
+
 export const StreamerDashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<DashboardTab>('connect');
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [twitchStatus, setTwitchStatus] = useState<TwitchStatusPayload | null>(null);
 
@@ -34,7 +38,7 @@ export const StreamerDashboard: React.FC = () => {
 
   const stored = getStoredConfig();
 
-  // Formulario de configuración (iniciado con lo guardado en el navegador)
+  // Formulario de configuración
   const [channel, setChannel] = useState<string>(stored?.channel || 'Rudzy_tv');
   const [botUsername, setBotUsername] = useState<string>(stored?.botUsername || 'Rudzy_tv');
   const [oauthToken, setOauthToken] = useState<string>(stored?.oauthToken || '');
@@ -45,7 +49,7 @@ export const StreamerDashboard: React.FC = () => {
 
   // Tema de la máquina y aviso de cuenta regresiva
   const [selectedTheme, setSelectedTheme] = useState<SlotTheme>(stored?.selectedTheme || 'carnival-green');
-  const [announceCountdown, setAnnounceCountdown] = useState<boolean>(stored?.announceCountdown ?? false);
+  const [announceCountdown, setAnnounceCountdown] = useState<boolean>(stored?.announceCountdown ?? true);
 
   // Estado de mensajes y copiado
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error' | 'info' | ''; message: string }>({
@@ -92,6 +96,23 @@ export const StreamerDashboard: React.FC = () => {
     s.on('connect', () => {
       setIsConnected(true);
       s.emit('get-twitch-status');
+
+      // Si el navegador ya tiene configuración almacenada, sincronizarla con el backend
+      if (stored?.channel) {
+        let finalCmd = '!points add {user} {prize}';
+        if (stored.commandType === 'short') finalCmd = '!p @{user} {prize}';
+        else if (stored.commandType === 'custom' && stored.customCommand) finalCmd = stored.customCommand;
+
+        s.emit('set-twitch-credentials', {
+          channel: stored.channel,
+          botUsername: stored.botUsername || stored.channel,
+          oauthToken: stored.oauthToken || '',
+          pointsCommand: finalCmd,
+          cooldownSeconds: stored.cooldownSeconds || 300,
+          theme: stored.selectedTheme || 'carnival-green',
+          announceCountdown: stored.announceCountdown !== undefined ? stored.announceCountdown : true,
+        });
+      }
     });
 
     s.on('disconnect', () => {
@@ -118,41 +139,6 @@ export const StreamerDashboard: React.FC = () => {
       if (status.announceCountdown !== undefined) {
         setAnnounceCountdown(status.announceCountdown);
       }
-
-      if (status.pointsCommand) {
-        if (status.pointsCommand.startsWith('!points add')) {
-          setCommandType('botrix');
-        } else if (status.pointsCommand.startsWith('!p')) {
-          setCommandType('short');
-        } else {
-          setCommandType('custom');
-          setCustomCommand(status.pointsCommand);
-        }
-      }
-
-      // Sincronizar en localStorage lo que el backend confirmó
-      saveToStorage({
-        channel: status.channel,
-        botUsername: status.botUsername,
-        oauthToken: status.oauthToken,
-        cooldownSeconds: status.cooldownSeconds,
-        selectedTheme: status.theme,
-        announceCountdown: status.announceCountdown,
-      });
-
-      // Si el backend viene sin token pero localStorage tiene credenciales guardadas, restaurar automáticamente
-      const storedData = getStoredConfig();
-      if (storedData?.oauthToken && (!status.oauthToken || !status.isAuthenticated)) {
-        s.emit('set-twitch-credentials', {
-          channel: storedData.channel || status.channel || 'Rudzy_tv',
-          botUsername: storedData.botUsername || status.botUsername || 'Rudzy_tv',
-          oauthToken: storedData.oauthToken,
-          pointsCommand: storedData.customCommand || status.pointsCommand || '!points add {user} {prize}',
-          cooldownSeconds: storedData.cooldownSeconds ?? status.cooldownSeconds ?? 300,
-          theme: storedData.selectedTheme || status.theme || 'carnival-green',
-          announceCountdown: storedData.announceCountdown ?? false,
-        });
-      }
     });
 
     return () => {
@@ -160,40 +146,46 @@ export const StreamerDashboard: React.FC = () => {
     };
   }, []);
 
-  // Guardar configuración (.env y casino_config.json)
+  // Guardar configuración completa en el servidor y en almacenamiento permanente
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!socketRef.current) return;
 
-    const cleanChannel = channel.trim().replace(/^#/, '');
-    if (!cleanChannel) {
+    if (!channel.trim()) {
       setSaveStatus({
         type: 'error',
-        message: 'Por favor ingresa TWITCH_CHANNEL (el nombre de tu canal).',
+        message: 'Por favor ingresa el nombre de tu canal de Twitch.',
       });
       return;
     }
 
     let finalCommand = '!points add {user} {prize}';
-    if (commandType === 'botrix') {
-      finalCommand = '!points add {user} {prize}';
-    } else if (commandType === 'short') {
+    if (commandType === 'short') {
       finalCommand = '!p @{user} {prize}';
     } else if (commandType === 'custom') {
       finalCommand = customCommand.trim() || '!points add {user} {prize}';
     }
 
-    // Guardar inmediatamente en localStorage
+    const cleanChannel = channel.trim().replace(/^#/, '');
+
+    // Persistir de inmediato en localStorage del navegador
     saveToStorage({
       channel: cleanChannel,
       botUsername: botUsername.trim() || cleanChannel,
       oauthToken: oauthToken.trim(),
       commandType,
-      customCommand: finalCommand,
+      customCommand,
       cooldownSeconds: Number(cooldownSeconds) || 300,
       selectedTheme,
       announceCountdown,
     });
+
+    if (!socketRef.current) {
+      setSaveStatus({
+        type: 'error',
+        message: 'No hay conexión con el backend (puerto 3000).',
+      });
+      return;
+    }
 
     setSaveStatus({
       type: 'info',
@@ -309,9 +301,9 @@ export const StreamerDashboard: React.FC = () => {
     });
   };
 
-  // URL para OBS
+  // URL para OBS (Limpia, transparente y sincronizada)
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const obsUrlString = `${baseUrl}/?overlay=true&theme=${selectedTheme}`;
+  const obsUrlString = `${baseUrl}/?overlay=true`;
 
   const handleCopyObsUrl = () => {
     navigator.clipboard.writeText(obsUrlString);
@@ -319,12 +311,12 @@ export const StreamerDashboard: React.FC = () => {
     setTimeout(() => setCopiedObsUrl(false), 3000);
   };
 
-  const isAuth = twitchStatus?.isAuthenticated;
-  const isSpinning = twitchStatus?.isSpinActive;
+  const isAuth = Boolean(twitchStatus?.isAuthenticated);
+  const isSpinning = Boolean(twitchStatus?.isSpinActive);
 
   return (
     <div className="streamer-dashboard-container">
-      {/* Barra de cabecera */}
+      {/* Barra de cabecera superior */}
       <header className="dashboard-header">
         <div className="header-left">
           <span className="brand-badge">🎰</span>
@@ -347,15 +339,54 @@ export const StreamerDashboard: React.FC = () => {
             <span className="status-text">
               {twitchStatus?.channel
                 ? isAuth
-                  ? `Canal: #${twitchStatus.channel} (Autenticado)`
-                  : `Canal: #${twitchStatus.channel} (Sólo Lectura)`
+                  ? `🟢 Canal: #${twitchStatus.channel} (Autenticado)`
+                  : `⚠️ Canal: #${twitchStatus.channel} (Sólo Lectura)`
                 : 'Twitch: Desconectado'}
             </span>
           </div>
         </div>
       </header>
 
-      {/* Banner de alerta de estado de la tirada */}
+      {/* Barra de Navegación por Pestañas / Secciones Claras */}
+      <nav className="dashboard-tabs-nav">
+        <button
+          type="button"
+          className={`tab-nav-btn ${activeTab === 'connect' ? 'active' : ''}`}
+          onClick={() => setActiveTab('connect')}
+        >
+          <span className="tab-icon">🔌</span>
+          <div className="tab-label-group">
+            <span className="tab-title">1. Conexión Twitch</span>
+            <span className="tab-sub">Canal, Bot y Token OAuth</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={`tab-nav-btn ${activeTab === 'slot' ? 'active' : ''}`}
+          onClick={() => setActiveTab('slot')}
+        >
+          <span className="tab-icon">🎰</span>
+          <div className="tab-label-group">
+            <span className="tab-title">2. Tragaperras & OBS</span>
+            <span className="tab-sub">Rudzy Fest, Temas y URL</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={`tab-nav-btn ${activeTab === 'cooldown' ? 'active' : ''}`}
+          onClick={() => setActiveTab('cooldown')}
+        >
+          <span className="tab-icon">⏱️</span>
+          <div className="tab-label-group">
+            <span className="tab-title">3. Cooldown & Chat</span>
+            <span className="tab-sub">Tiempos y Avisos 3, 2, 1...</span>
+          </div>
+        </button>
+      </nav>
+
+      {/* Banner de alerta si la ruleta está girando en OBS */}
       {isSpinning && (
         <div className="banner-spinning">
           <span className="spin-pulse" />
@@ -363,343 +394,494 @@ export const StreamerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Alerta de guardado */}
+      {/* Alerta flotante de guardado */}
       {saveStatus.message && (
         <div className={`save-status-toast ${saveStatus.type}`}>
           {saveStatus.message}
         </div>
       )}
 
-      {/* Contenido principal */}
-      <main className="dashboard-main-content">
+      {/* Contenedor Principal de la Pestaña Activa */}
+      <main className="tab-content-wrapper">
         {/* =========================================================================
-            COLUMNA IZQUIERDA: CONFIGURACIÓN (.ENV)
+            PESTAÑA 1: CONEXIÓN & INICIO (Configuración de Twitch)
             ========================================================================= */}
-        <section className="column-config">
-          <div className="dash-card card-credentials">
-            <div className="card-header">
-              <h2>⚙️ Configuración de Twitch</h2>
-              <p className="card-desc">
-                Configura tu canal para que la ruleta reconozca a tus espectadores y entregue puntos. Se guarda de forma permanente aunque apagues el PC.
-              </p>
-            </div>
-
-            <form onSubmit={handleSave} className="credentials-form">
-              {/* TWITCH_CHANNEL */}
-              <div className="form-group">
-                <label htmlFor="twitch-channel">
-                  Canal de Twitch (TWITCH_CHANNEL):
-                  <span className="label-required">*</span>
-                </label>
-                <div className="input-prefix-wrapper">
-                  <span className="input-prefix">twitch.tv/</span>
-                  <input
-                    id="twitch-channel"
-                    type="text"
-                    placeholder="TuNombreDeCanal"
-                    value={channel}
-                    onChange={(e) => setChannel(e.target.value)}
-                    required
-                    className="form-input"
-                  />
+        {activeTab === 'connect' && (
+          <div className="tab-pane-container connect-pane">
+            {/* Banner de Estado de Autenticación */}
+            {!isAuth && (
+              <div className="auth-alert-card">
+                <div className="auth-alert-icon">⚠️</div>
+                <div className="auth-alert-body">
+                  <h4 className="auth-alert-title">
+                    {twitchStatus?.authError
+                      ? 'Token OAuth Vencido o Inválido (Modo Sólo Lectura)'
+                      : 'Conectado en Modo Sólo Lectura (Sin Entrega de Puntos)'}
+                  </h4>
+                  <p className="auth-alert-desc">
+                    En este modo la ruleta visual funciona en OBS cuando un espectador usa <code>!spin</code>, pero <b>no puede enviar <code>!points add</code> para entregar los puntos ni mandar los avisos de cooldown en el chat</b>.
+                  </p>
+                  <p className="auth-alert-solution">
+                    👉 <b>Solución rápida (tarda 10 segundos):</b> Genera un token nuevo y pégalo abajo:
+                  </p>
+                  <div className="auth-alert-actions">
+                    <a
+                      href="https://twitchapps.com/tmi/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-token-action primary"
+                    >
+                      🔑 1. Generar Token en TwitchApps.com (Recomendado - Oficial e Indefinido)
+                    </a>
+                    <a
+                      href="https://twitchtokengenerator.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-token-action secondary"
+                    >
+                      🔗 2. TwitchTokenGenerator.com
+                    </a>
+                  </div>
                 </div>
-                <span className="input-help">
-                  Es el canal donde se activará la ruleta con el comando <code>!spin</code> (o <code>!ruleta</code>).
-                </span>
+              </div>
+            )}
+
+            {isAuth && (
+              <div className="auth-success-card">
+                <div className="auth-success-icon">🟢</div>
+                <div className="auth-success-body">
+                  <h4>¡Conexión Totalmente Autenticada!</h4>
+                  <p>
+                    El bot está conectado como <b>@{botUsername || channel}</b> en <b>#{channel}</b>.
+                    Entregará puntos automáticamente con <code>!points add</code> tras cada tirada y enviará los avisos en el chat.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Tarjeta de Formulario */}
+            <div className="dash-card card-credentials">
+              <div className="card-header">
+                <h2>⚙️ Datos de Conexión a Twitch</h2>
+                <p className="card-desc">
+                  Configura tu canal y tu token OAuth. Los datos se guardan de forma permanente en tu equipo aunque reinicies o apagues el ordenador.
+                </p>
               </div>
 
-              {/* TWITCH_BOT_USERNAME */}
-              <div className="form-group">
-                <label htmlFor="bot-username">
-                  Usuario del Bot / Streamer (TWITCH_BOT_USERNAME):
-                </label>
-                <div className="input-prefix-wrapper">
-                  <span className="input-prefix">@</span>
-                  <input
-                    id="bot-username"
-                    type="text"
-                    placeholder="TuCanal (o bot autorizado)"
-                    value={botUsername}
-                    onChange={(e) => setBotUsername(e.target.value)}
-                    className="form-input"
-                  />
+              <form onSubmit={handleSave} className="credentials-form">
+                {/* TWITCH_CHANNEL */}
+                <div className="form-group">
+                  <label htmlFor="twitch-channel">
+                    Canal de Twitch (TWITCH_CHANNEL):
+                    <span className="label-required">*</span>
+                  </label>
+                  <div className="input-prefix-wrapper">
+                    <span className="input-prefix">twitch.tv/</span>
+                    <input
+                      id="twitch-channel"
+                      type="text"
+                      placeholder="TuNombreDeCanal"
+                      value={channel}
+                      onChange={(e) => setChannel(e.target.value)}
+                      required
+                      className="form-input"
+                    />
+                  </div>
+                  <span className="input-help">
+                    Es el canal donde se activará la ruleta con el comando <code>!spin</code> (o canjes de BotRix).
+                  </span>
                 </div>
-                <span className="input-help">
-                  Cuenta desde la que se enviará el comando de recompensa al ganador.
-                </span>
-              </div>
 
-              {/* TWITCH_OAUTH_TOKEN */}
-              <div className="form-group">
-                <label htmlFor="oauth-token">
-                  Token OAuth de Twitch (TWITCH_OAUTH_TOKEN):
-                </label>
-                <div className="input-password-wrapper">
-                  <input
-                    id="oauth-token"
-                    type={showToken ? 'text' : 'password'}
-                    placeholder="oauth:xxxxxxxxxxxxxxxxxxxx"
-                    value={oauthToken}
-                    onChange={(e) => setOauthToken(e.target.value)}
-                    className="form-input"
-                  />
+                {/* TWITCH_BOT_USERNAME */}
+                <div className="form-group">
+                  <label htmlFor="bot-username">
+                    Usuario del Bot / Streamer (TWITCH_BOT_USERNAME):
+                  </label>
+                  <div className="input-prefix-wrapper">
+                    <span className="input-prefix">@</span>
+                    <input
+                      id="bot-username"
+                      type="text"
+                      placeholder="TuCanal (o bot autorizado)"
+                      value={botUsername}
+                      onChange={(e) => setBotUsername(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                  <span className="input-help">
+                    Cuenta desde la que se enviará el comando de entrega de puntos al ganador en el chat.
+                  </span>
+                </div>
+
+                {/* TWITCH_OAUTH_TOKEN */}
+                <div className="form-group">
+                  <div className="token-label-row">
+                    <label htmlFor="oauth-token">
+                      Token OAuth de Twitch (TWITCH_OAUTH_TOKEN):
+                    </label>
+                    <a
+                      href="https://twitchapps.com/tmi/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-quick-token"
+                    >
+                      🔑 Generar Token en 1 Clic
+                    </a>
+                  </div>
+                  <div className="input-password-wrapper">
+                    <input
+                      id="oauth-token"
+                      type={showToken ? 'text' : 'password'}
+                      placeholder="oauth:xxxxxxxxxxxxxxxxxxxx"
+                      value={oauthToken}
+                      onChange={(e) => setOauthToken(e.target.value)}
+                      className="form-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      className="btn-toggle-show"
+                      title={showToken ? 'Ocultar token' : 'Mostrar token'}
+                    >
+                      {showToken ? '👁️ Ocultar' : '🔒 Ver'}
+                    </button>
+                  </div>
+                  <span className="input-help">
+                    Permite que el bot pueda escribir en tu chat para premiar con puntos y avisar del cooldown.
+                  </span>
+                </div>
+
+                {/* POINTS_COMMAND */}
+                <div className="form-group">
+                  <label>Comando para Entregar Puntos al Ganador:</label>
+                  <div className="radio-options">
+                    <label className={`radio-card ${commandType === 'botrix' ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="cmd-type"
+                        value="botrix"
+                        checked={commandType === 'botrix'}
+                        onChange={() => setCommandType('botrix')}
+                      />
+                      <div className="radio-content">
+                        <strong>BotRix / StreamElements (Recomendado)</strong>
+                        <code>!points add &#123;user&#125; &#123;prize&#125;</code>
+                      </div>
+                    </label>
+
+                    <label className={`radio-card ${commandType === 'short' ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="cmd-type"
+                        value="short"
+                        checked={commandType === 'short'}
+                        onChange={() => setCommandType('short')}
+                      />
+                      <div className="radio-content">
+                        <strong>Comando Corto (!p)</strong>
+                        <code>!p @&#123;user&#125; &#123;prize&#125;</code>
+                      </div>
+                    </label>
+
+                    <label className={`radio-card ${commandType === 'custom' ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="cmd-type"
+                        value="custom"
+                        checked={commandType === 'custom'}
+                        onChange={() => setCommandType('custom')}
+                      />
+                      <div className="radio-content">
+                        <strong>Personalizado</strong>
+                        <span>Define tu propio comando</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {commandType === 'custom' && (
+                    <div className="custom-cmd-input">
+                      <input
+                        type="text"
+                        placeholder="Ej: !addpoints {user} {prize}"
+                        value={customCommand}
+                        onChange={(e) => setCustomCommand(e.target.value)}
+                        className="form-input"
+                      />
+                      <span className="input-help">
+                        Usa <code>&#123;user&#125;</code> para el ganador y <code>&#123;prize&#125;</code> para la cantidad de puntos.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones de Acción */}
+                <div className="form-actions-row">
+                  <button type="submit" className="btn-save-credentials">
+                    💾 Guardar y Conectar a Twitch
+                  </button>
+
                   <button
                     type="button"
-                    onClick={() => setShowToken(!showToken)}
-                    className="btn-toggle-show"
-                    title={showToken ? 'Ocultar token' : 'Mostrar token'}
+                    className="btn-next-tab"
+                    onClick={() => setActiveTab('slot')}
                   >
-                    {showToken ? '👁️ Ocultar' : '🔒 Ver'}
+                    👉 Ver Tragaperras & OBS (Paso 2)
                   </button>
                 </div>
+              </form>
+            </div>
+          </div>
+        )}
 
-                <div className="token-helper-box">
-                  <span className="helper-title">¿Cómo encontrar tu Token OAuth en 10 segundos?</span>
-                  <p>
-                    1. Entra a la web oficial y segura de Twitch Token Generator.
-                    <br />
-                    2. Inicia sesión con la cuenta de <b>{botUsername || channel || 'tu canal'}</b>.
-                    <br />
-                    3. Copia el token que empieza por <code>oauth:...</code> y pégalo arriba.
-                  </p>
+        {/* =========================================================================
+            PESTAÑA 2: TRAGAPERRAS RUDZY FEST & OBS STUDIO
+            ========================================================================= */}
+        {activeTab === 'slot' && (
+          <div className="tab-pane-container slot-pane">
+            {/* Card de OBS Overlay */}
+            <div className="dash-card card-obs-link">
+              <div className="obs-header">
+                <div className="obs-title-group">
+                  <span className="obs-badge">🎬 OBS Studio</span>
+                  <h3>URL para tu Fuente de Navegador en OBS</h3>
+                </div>
+                <div className="obs-action-buttons">
+                  <button
+                    type="button"
+                    onClick={handleCopyObsUrl}
+                    className={`btn-copy-obs ${copiedObsUrl ? 'copied' : ''}`}
+                  >
+                    {copiedObsUrl ? '✅ ¡URL Copiada!' : '📋 Copiar URL para OBS'}
+                  </button>
                   <a
-                    href="https://twitchtokengenerator.com"
+                    href={obsUrlString}
                     target="_blank"
                     rel="noreferrer"
-                    className="btn-open-token-gen"
+                    className="btn-open-obs-preview"
                   >
-                    🔗 Encontrar mi Token OAuth en TwitchTokenGenerator.com
+                    🔗 Abrir Ruleta en Pestaña Limpia
                   </a>
                 </div>
               </div>
 
-              {/* POINTS_COMMAND */}
-              <div className="form-group">
-                <label>Comando para Entregar Puntos al Ganador:</label>
-                <div className="radio-options">
-                  <label className={`radio-card ${commandType === 'botrix' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="cmd-type"
-                      value="botrix"
-                      checked={commandType === 'botrix'}
-                      onChange={() => setCommandType('botrix')}
-                    />
-                    <div className="radio-content">
-                      <strong>BotRix / StreamElements</strong>
-                      <code>!points add &#123;user&#125; &#123;prize&#125;</code>
-                    </div>
-                  </label>
+              <div className="obs-input-row">
+                <input
+                  type="text"
+                  readOnly
+                  value={obsUrlString}
+                  className="obs-url-input"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+              </div>
 
-                  <label className={`radio-card ${commandType === 'short' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="cmd-type"
-                      value="short"
-                      checked={commandType === 'short'}
-                      onChange={() => setCommandType('short')}
-                    />
-                    <div className="radio-content">
-                      <strong>Comando Corto (!p)</strong>
-                      <code>!p @&#123;user&#125; &#123;prize&#125;</code>
-                    </div>
-                  </label>
+              <div className="obs-guide-pills">
+                <span>Resolución en OBS: <b>1920 x 1080</b></span>
+                <span>•</span>
+                <span>Fondo: <b>100% Transparente</b></span>
+                <span>•</span>
+                <span>Marcar: <b>Controlar audio vía OBS</b></span>
+              </div>
+            </div>
 
-                  <label className={`radio-card ${commandType === 'custom' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="cmd-type"
-                      value="custom"
-                      checked={commandType === 'custom'}
-                      onChange={() => setCommandType('custom')}
-                    />
-                    <div className="radio-content">
-                      <strong>Personalizado</strong>
-                      <span>Define tu propio comando</span>
-                    </div>
-                  </label>
+            {/* Selector de Temas Visuales (8 Temas) */}
+            <div className="dash-card card-themes-selector">
+              <div className="themes-header">
+                <h3>🎨 Elige el Tema Visual de Rudzy Fest</h3>
+                <span className="themes-count">8 Estilos Exclusivos Disponibles</span>
+              </div>
+
+              <div className="themes-grid">
+                {THEMES_LIST.map((theme) => {
+                  const isSelected = selectedTheme === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      className={`theme-card-btn ${isSelected ? 'active' : ''}`}
+                      onClick={() => handleSelectTheme(theme.id)}
+                    >
+                      <div className="theme-preview-palette" style={{ background: theme.colorPreview }}>
+                        <span className="theme-card-icon">{theme.icon}</span>
+                      </div>
+                      <div className="theme-info">
+                        <span className="theme-name">{theme.name}</span>
+                        <span className="theme-desc">{theme.subtitle}</span>
+                      </div>
+                      {isSelected && <span className="theme-badge-selected">✓ ACTIVO</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Escenario de la Tragaperras en Vivo */}
+            <div className="dash-card card-live-machine">
+              <div className="stage-header-bar">
+                <div className="stage-title">
+                  <span className="stage-dot" />
+                  <h4>Vista Previa de la Máquina en Pantalla</h4>
                 </div>
 
-                {commandType === 'custom' && (
-                  <div className="custom-cmd-input">
-                    <input
-                      type="text"
-                      placeholder="Ej: !addpoints {user} {prize}"
-                      value={customCommand}
-                      onChange={(e) => setCustomCommand(e.target.value)}
-                      className="form-input"
-                    />
-                    <span className="input-help">
-                      Usa <code>&#123;user&#125;</code> para el nombre del ganador y <code>&#123;prize&#125;</code> para la cantidad de puntos.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Botón de Guardado */}
-              <div className="form-actions">
-                <button type="submit" className="btn-save-credentials">
-                  💾 Guardar y Aplicar Cambios
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        {/* =========================================================================
-            COLUMNA DERECHA: OBS Y PRUEBAS EN VIVO
-            ========================================================================= */}
-        <section className="column-live">
-          {/* Card de OBS Overlay */}
-          <div className="dash-card card-obs-link">
-            <div className="obs-header">
-              <span className="obs-badge">🎬 OBS Studio</span>
-              <h3>URL para Pegar en tu OBS</h3>
-            </div>
-            <p className="obs-desc">
-              Esta URL genera la ruleta transparente lista para integrarse como <b>Navegador (Browser Source)</b> en tu OBS Studio. Solo se mostrará cuando un espectador juegue con <code>!spin</code>.
-            </p>
-
-            <div className="obs-input-row">
-              <input
-                type="text"
-                readOnly
-                value={obsUrlString}
-                className="obs-url-input"
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-              />
-              <button
-                type="button"
-                onClick={handleCopyObsUrl}
-                className={`btn-copy-obs ${copiedObsUrl ? 'copied' : ''}`}
-              >
-                {copiedObsUrl ? '✅ ¡Copiada!' : '📋 Copiar URL'}
-              </button>
-              <a
-                href={obsUrlString}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-open-obs-preview"
-                title="Abrir ruleta limpia en pestaña nueva para verificar transparencia"
-              >
-                🔗 Ver Ruleta Limpia
-              </a>
-            </div>
-
-            <div className="obs-guide-pills">
-              <span>Resolución sugerida: <b>1920 x 1080</b></span>
-              <span>•</span>
-              <span>Marcar: <b>Controlar audio vía OBS</b></span>
-              <span>•</span>
-              <span>Fondo: <b>100% Transparente</b></span>
-            </div>
-          </div>
-
-          {/* Configuración de Cooldown */}
-          <div className="dash-card card-cooldown">
-            <div className="cooldown-header">
-              <span className="cooldown-badge">⏱️ Cooldown de Tiradas</span>
-              <h3>Tiempo de Espera entre Ruletas</h3>
-            </div>
-            <p className="cooldown-desc">
-              Define cuánto tiempo debe transcurrir entre cada ruleta. Ajusta los minutos o segundos a tu gusto:
-            </p>
-
-            {/* Presets rápidos */}
-            <div className="cooldown-presets">
-              <span className="presets-label">Tiempos rápidos:</span>
-              <button
-                type="button"
-                className={`btn-cd-preset ${cooldownSeconds === 10 ? 'active' : ''}`}
-                onClick={() => handleUpdateCooldown(10)}
-              >
-                ⚡ 10s (Pruebas)
-              </button>
-              <button
-                type="button"
-                className={`btn-cd-preset ${cooldownSeconds === 30 ? 'active' : ''}`}
-                onClick={() => handleUpdateCooldown(30)}
-              >
-                30 seg
-              </button>
-              <button
-                type="button"
-                className={`btn-cd-preset ${cooldownSeconds === 60 ? 'active' : ''}`}
-                onClick={() => handleUpdateCooldown(60)}
-              >
-                1 min
-              </button>
-              <button
-                type="button"
-                className={`btn-cd-preset ${cooldownSeconds === 120 ? 'active' : ''}`}
-                onClick={() => handleUpdateCooldown(120)}
-              >
-                2 min
-              </button>
-              <button
-                type="button"
-                className={`btn-cd-preset ${cooldownSeconds === 300 ? 'active' : ''}`}
-                onClick={() => handleUpdateCooldown(300)}
-              >
-                🎯 5 min (BotRix)
-              </button>
-              <button
-                type="button"
-                className={`btn-cd-preset ${cooldownSeconds === 600 ? 'active' : ''}`}
-                onClick={() => handleUpdateCooldown(600)}
-              >
-                10 min
-              </button>
-            </div>
-
-            {/* Selector manual en segundos */}
-            <div className="cooldown-adjuster">
-              <div className="cooldown-current-display">
-                <span className="cd-label">Tiempo configurado:</span>
-                <span className="cd-val-highlight">
-                  {Math.floor(cooldownSeconds / 60)} min {cooldownSeconds % 60} seg ({cooldownSeconds}s)
-                </span>
-              </div>
-
-              <div className="cooldown-inputs-row">
-                <div className="cd-stepper">
+                <div className="quick-test-bar">
+                  <span className="test-bar-label">Probar Tirada:</span>
                   <button
                     type="button"
-                    className="btn-step"
+                    className="btn-prize-pill"
+                    onClick={() => handleTriggerTest(50, 'Viewer50')}
+                  >
+                    🎰 50 pts
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-prize-pill"
+                    onClick={() => handleTriggerTest(500, 'Viewer500')}
+                  >
+                    ⭐ 500 pts
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-prize-pill"
+                    onClick={() => handleTriggerTest(2500, 'Viewer2500')}
+                  >
+                    💎 2,500 pts
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-prize-pill jackpot-pill"
+                    onClick={() => handleTriggerTest(100000, 'JACKPOT_WINNER')}
+                  >
+                    🔥 ¡100,000 pts!
+                  </button>
+                </div>
+              </div>
+
+              <div className="stage-canvas-wrapper">
+                <SlotMachine theme={selectedTheme} />
+              </div>
+            </div>
+
+            {/* Botón para ir al paso 3 */}
+            <div className="tab-footer-actions">
+              <button
+                type="button"
+                className="btn-next-tab"
+                onClick={() => setActiveTab('cooldown')}
+              >
+                👉 Configurar Cooldown y Avisos en Chat (Paso 3)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            PESTAÑA 3: COOLDOWN & AVISOS EN EL CHAT (3, 2, 1...)
+            ========================================================================= */}
+        {activeTab === 'cooldown' && (
+          <div className="tab-pane-container cooldown-pane">
+            <div className="dash-card card-cooldown-control">
+              <div className="cooldown-card-header">
+                <div className="cooldown-title-group">
+                  <span className="cooldown-icon">⏱️</span>
+                  <div>
+                    <h3 className="cooldown-title">Tiempo de Espera entre Ruletas (Cooldown)</h3>
+                    <p className="cooldown-desc">
+                      Define cuánto tiempo debe transcurrir antes de que otro espectador pueda volver a activar la ruleta con <code>!spin</code>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="cooldown-active-pill">
+                  Actual: <b>{cooldownSeconds}s</b> ({Math.floor(cooldownSeconds / 60)}m {cooldownSeconds % 60}s)
+                </div>
+              </div>
+
+              {/* Presets Rápidos */}
+              <div className="cooldown-presets-section">
+                <span className="presets-label">Tiempos rápidos:</span>
+                <div className="cooldown-presets-grid">
+                  <button
+                    type="button"
+                    className={`preset-btn ${cooldownSeconds === 10 ? 'active' : ''}`}
+                    onClick={() => handleUpdateCooldown(10)}
+                  >
+                    ⚡ 10s (Pruebas)
+                  </button>
+                  <button
+                    type="button"
+                    className={`preset-btn ${cooldownSeconds === 30 ? 'active' : ''}`}
+                    onClick={() => handleUpdateCooldown(30)}
+                  >
+                    30 segundos
+                  </button>
+                  <button
+                    type="button"
+                    className={`preset-btn ${cooldownSeconds === 60 ? 'active' : ''}`}
+                    onClick={() => handleUpdateCooldown(60)}
+                  >
+                    1 minuto
+                  </button>
+                  <button
+                    type="button"
+                    className={`preset-btn ${cooldownSeconds === 120 ? 'active' : ''}`}
+                    onClick={() => handleUpdateCooldown(120)}
+                  >
+                    2 minutos
+                  </button>
+                  <button
+                    type="button"
+                    className={`preset-btn ${cooldownSeconds === 300 ? 'active' : ''}`}
+                    onClick={() => handleUpdateCooldown(300)}
+                  >
+                    🎯 5 minutos (BotRix)
+                  </button>
+                  <button
+                    type="button"
+                    className={`preset-btn ${cooldownSeconds === 600 ? 'active' : ''}`}
+                    onClick={() => handleUpdateCooldown(600)}
+                  >
+                    10 minutos
+                  </button>
+                </div>
+              </div>
+
+              {/* Ajuste personalizado */}
+              <div className="cooldown-custom-row">
+                <span className="custom-cd-label">Ajuste personalizado en segundos:</span>
+                <div className="cd-stepper-wrap">
+                  <button
+                    type="button"
+                    className="btn-cd-step"
                     onClick={() => handleUpdateCooldown(Math.max(5, cooldownSeconds - 10))}
-                    title="Restar 10 segundos"
                   >
                     -10s
                   </button>
                   <input
                     type="number"
-                    min="0"
-                    max="7200"
+                    min="1"
+                    max="86400"
                     value={cooldownSeconds}
-                    onChange={(e) => setCooldownSeconds(Number(e.target.value))}
+                    onChange={(e) => setCooldownSeconds(Math.max(1, parseInt(e.target.value, 10) || 1))}
                     className="input-cd-custom"
                   />
                   <span className="cd-unit">seg</span>
                   <button
                     type="button"
-                    className="btn-step"
+                    className="btn-cd-step"
                     onClick={() => handleUpdateCooldown(cooldownSeconds + 10)}
-                    title="Sumar 10 segundos"
                   >
                     +10s
                   </button>
+                  <button
+                    type="button"
+                    className="btn-apply-cd"
+                    onClick={() => handleUpdateCooldown(cooldownSeconds)}
+                  >
+                    Aplicar
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  className="btn-apply-cd"
-                  onClick={() => handleUpdateCooldown(cooldownSeconds)}
-                >
-                  💾 Aplicar Cooldown
-                </button>
               </div>
 
-              {/* Checkbox para activar/desactivar avisos de cuenta regresiva en el chat */}
+              {/* Toggle de Avisos de Cuenta Regresiva */}
               <div className="countdown-toggle-row">
                 <label className="toggle-checkbox-label">
                   <input
@@ -708,136 +890,36 @@ export const StreamerDashboard: React.FC = () => {
                     onChange={(e) => handleToggleCountdown(e.target.checked)}
                   />
                   <span className="toggle-checkbox-text">
-                    📢 Avisar cuenta regresiva en el chat de Twitch (3, 2, 1... ¡RULETA YA DISPONIBLE!)
+                    📢 Enviar avisos de cuenta regresiva en el chat de Twitch (3, 2, 1... ¡RULETA YA DISPONIBLE!)
                   </span>
                 </label>
                 <span className="toggle-checkbox-hint">
-                  Desactivado por defecto para mantener el chat limpio y no ser invasivo.
+                  Tu cuenta de streamer enviará automáticamente un conteo al chat de Twitch cuando el cooldown esté por terminar para que los viewers se preparen para el próximo <code>!spin</code>.
                 </span>
               </div>
 
+              {/* Acciones de prueba y reseteo */}
               <div className="cooldown-actions-group">
                 <button
                   type="button"
-                  className="btn-test-countdown"
                   onClick={handleTestCountdown}
-                  title="Prueba el envío de la cuenta regresiva (3, 2, 1... ¡¡¡¡¡RULETA YA DISPONIBLE!!!!!) en tu chat de Twitch"
+                  className="btn-test-countdown"
+                  title="Envía una simulación de los avisos 3, 2, 1 al chat"
                 >
-                  📢 Probar Aviso en Chat (3, 2, 1...)
+                  📢 Probar Conteo en el Chat Ahora (3, 2, 1...)
                 </button>
+
                 <button
                   type="button"
+                  onClick={handleResetCooldown}
                   className="btn-reset-now"
-                  onClick={handleResetCooldown}
-                  title="Reiniciar el tiempo de espera ahora mismo"
                 >
-                  🔄 Resetear Cooldown Ahora
+                  🔄 Resetear Cooldown Inmediatamente
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Selector de Tema de la Tragaperras */}
-          <div className="dash-card card-theme-picker">
-            <div className="theme-picker-header">
-              <div className="theme-header-left">
-                <span className="theme-picker-title">🎨 Estilos para "Rudzy Fest" (8 Temas Únicos):</span>
-                <p className="theme-picker-subtitle">
-                  Elige el diseño que prefieras. Cada tema modifica su estética, molduras, bombillas y colores.
-                </p>
-              </div>
-              <span className="theme-active-tag">
-                Tema activo: <b>{THEMES_LIST.find((t) => t.id === selectedTheme)?.name || selectedTheme}</b>
-              </span>
-            </div>
-
-            <div className="theme-options-grid grid-8-themes">
-              {THEMES_LIST.map((th) => (
-                <button
-                  key={th.id}
-                  type="button"
-                  className={`theme-card-btn theme-btn-${th.id} ${selectedTheme === th.id ? 'active' : ''}`}
-                  onClick={() => handleSelectTheme(th.id)}
-                >
-                  <div className="theme-badge-row">
-                    <span className="theme-icon">{th.icon}</span>
-                    <span className="theme-tag-pill">{th.tag}</span>
-                    {selectedTheme === th.id && <span className="theme-checkmark">✓</span>}
-                  </div>
-                  <div className="theme-card-info">
-                    <strong>{th.name}</strong>
-                    <span>{th.subtitle}</span>
-                  </div>
-                  <div className="theme-color-preview-bar" style={{ background: th.colorPreview }} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Vista Previa en Vivo y Pruebas */}
-          <div className="dash-card card-live-machine">
-            <div className="stage-header-bar">
-              <span className="stage-title">
-                🔴 Vista en Vivo de la Máquina (Se activa en tu stream con <code>!spin</code> o <code>!ruleta</code>)
-              </span>
-
-              <div className="stage-quick-actions">
-                <button
-                  type="button"
-                  className="btn-quick-spin"
-                  onClick={() => handleTriggerTest(500, 'ViewerPrueba')}
-                >
-                  🎰 Probar Tirada
-                </button>
-                <button
-                  type="button"
-                  className="btn-quick-reset"
-                  onClick={handleResetCooldown}
-                >
-                  ⏱️ Reset Cooldown
-                </button>
-              </div>
-            </div>
-
-            {/* Escenario de la máquina con el tema seleccionado */}
-            <div className="stage-canvas-wrapper">
-              <SlotMachine isOverlayMode={false} isPreviewEmbedded={true} theme={selectedTheme} />
-            </div>
-
-            {/* Selector de premios para prueba rápida */}
-            <div className="quick-test-bar">
-              <span className="test-bar-label">Probar premio específico:</span>
-              <button
-                type="button"
-                className="btn-prize-pill"
-                onClick={() => handleTriggerTest(50, 'Viewer50')}
-              >
-                50 pts
-              </button>
-              <button
-                type="button"
-                className="btn-prize-pill"
-                onClick={() => handleTriggerTest(500, 'Viewer500')}
-              >
-                500 pts
-              </button>
-              <button
-                type="button"
-                className="btn-prize-pill"
-                onClick={() => handleTriggerTest(2500, 'Viewer2500')}
-              >
-                2,500 pts
-              </button>
-              <button
-                type="button"
-                className="btn-prize-pill jackpot-pill"
-                onClick={() => handleTriggerTest(100000, 'ViewerJackpot')}
-              >
-                🌟 100,000 pts (JACKPOT)
-              </button>
-            </div>
-          </div>
-        </section>
+        )}
       </main>
     </div>
   );

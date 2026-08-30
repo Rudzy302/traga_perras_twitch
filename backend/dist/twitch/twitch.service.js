@@ -25,12 +25,13 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.logger = new common_1.Logger(TwitchService_1.name);
         this.client = null;
         this.isAuthenticated = false;
+        this.authError = null;
         this.currentChannel = '';
         this.currentBotUsername = '';
         this.currentOauthToken = '';
         this.pointsCommandPattern = '!points add {user} {prize}';
         this.currentTheme = 'carnival-green';
-        this.announceCountdownInChat = false;
+        this.announceCountdownInChat = true;
         this.SPIN_DURATION_MS = 15500;
         this.cooldownMs = 5 * 60 * 1000;
         this.PRIZE_TIERS = [
@@ -140,7 +141,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
                         this.pointsCommandPattern = parsed.pointsCommand || '!points add {user} {prize}';
                         this.cooldownMs = (Number(parsed.cooldownSeconds) || 300) * 1000;
                         this.currentTheme = parsed.theme || 'carnival-green';
-                        this.announceCountdownInChat = parsed.announceCountdown === true;
+                        this.announceCountdownInChat = parsed.announceCountdown !== undefined ? Boolean(parsed.announceCountdown) : true;
                         this.logger.log(`📂 [Config Cargada desde JSON ${p}]: Canal #${this.currentChannel} | Cooldown ${parsed.cooldownSeconds}s`);
                         return;
                     }
@@ -170,7 +171,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
                         this.pointsCommandPattern = envMap.POINTS_COMMAND || '!points add {user} {prize}';
                         this.cooldownMs = (Number(envMap.COOLDOWN_SECONDS) || 300) * 1000;
                         this.currentTheme = envMap.THEME || 'carnival-green';
-                        this.announceCountdownInChat = envMap.ANNOUNCE_COUNTDOWN === 'true';
+                        this.announceCountdownInChat = envMap.ANNOUNCE_COUNTDOWN !== undefined ? envMap.ANNOUNCE_COUNTDOWN === 'true' : true;
                         this.logger.log(`📂 [Config Cargada desde .env ${p}]: Canal #${this.currentChannel}`);
                         return;
                     }
@@ -184,7 +185,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
         this.cooldownMs = (Number(process.env.COOLDOWN_SECONDS) || 300) * 1000;
         this.currentTheme = 'carnival-green';
-        this.announceCountdownInChat = false;
+        this.announceCountdownInChat = true;
     }
     async disconnectFromTwitch() {
         if (this.client) {
@@ -202,7 +203,8 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.logger.warn('⚠️ No se puede conectar a Twitch: Canal vacío.');
             return;
         }
-        const cleanChannel = this.currentChannel.replace(/^#/, '');
+        const cleanChannel = this.currentChannel.replace(/^#/, '').toLowerCase().trim();
+        const botNick = (this.currentBotUsername || cleanChannel).replace(/^@/, '').toLowerCase().trim();
         let formattedToken = (this.currentOauthToken || '').trim();
         if (formattedToken && !formattedToken.startsWith('oauth:')) {
             formattedToken = `oauth:${formattedToken}`;
@@ -212,16 +214,15 @@ let TwitchService = TwitchService_1 = class TwitchService {
             channels: [cleanChannel],
         };
         if (formattedToken && formattedToken.length > 6) {
-            const botNick = this.currentBotUsername || cleanChannel;
             clientOptions.identity = {
                 username: botNick,
                 password: formattedToken,
             };
-            this.isAuthenticated = true;
             this.logger.log(`🔐 Conectando a Twitch en MODO AUTENTICADO como @${botNick} en #${cleanChannel}...`);
         }
         else {
             this.isAuthenticated = false;
+            this.authError = 'No se ha configurado Token OAuth';
             this.logger.warn(`👁️ Conectando a Twitch en MODO SÓLO LECTURA anónimo en #${cleanChannel} (Sin Token OAuth). La ruleta visual funcionará pero no podrá enviar comandos de puntos.`);
         }
         try {
@@ -231,6 +232,10 @@ let TwitchService = TwitchService_1 = class TwitchService {
             });
             this.client.on('connected', (addr, port) => {
                 this.logger.log(`✅ [Twitch IRC Conectado] en ${addr}:${port} | Canal: #${cleanChannel}`);
+                if (clientOptions.identity) {
+                    this.isAuthenticated = true;
+                    this.authError = null;
+                }
                 this.casinoGateway.emitTwitchStatus(this.getStatus());
             });
             this.client.on('disconnected', (reason) => {
@@ -243,7 +248,15 @@ let TwitchService = TwitchService_1 = class TwitchService {
         catch (error) {
             this.logger.error(`❌ Error al conectar con Twitch: ${error.message || error}`);
             this.isAuthenticated = false;
+            this.authError = error.message || 'Token inválido o expirado. Genera uno nuevo en twitchapps.com/tmi';
             this.casinoGateway.emitTwitchStatus(this.getStatus());
+            try {
+                this.client = new tmi.Client({ channels: [cleanChannel] });
+                this.client.on('message', (ch, tags, msg) => this.handleChatMessage(ch, tags, msg));
+                await this.client.connect();
+                this.logger.log(`👁️ Conectado en MODO SÓLO LECTURA anónimo en #${cleanChannel}`);
+            }
+            catch { }
         }
     }
     async handleChatMessage(channel, tags, message) {
@@ -550,6 +563,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
             botUsername: this.currentBotUsername,
             oauthToken: this.currentOauthToken,
             isAuthenticated: this.isAuthenticated,
+            authError: this.authError,
             isSpinActive: this.isSpinActive,
             cooldownSeconds: Math.round(this.cooldownMs / 1000),
             pointsCommand: this.pointsCommandPattern,

@@ -2601,6 +2601,312 @@ body.overlay-mode {
 }
 
 /* ==========================================================================
+   NAVEGACIÓN POR PESTAÑAS (TABS) MODERNAS Y LIMPIAS
+   ========================================================================== */
+.dashboard-tabs-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  max-width: 950px;
+  margin: 0 auto 24px auto;
+  padding: 0 16px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-tabs-nav {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tab-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(18, 20, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-nav-btn:hover {
+  background: rgba(26, 29, 46, 0.95);
+  border-color: rgba(145, 70, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.tab-nav-btn.active {
+  background: linear-gradient(135deg, rgba(145, 70, 255, 0.25) 0%, rgba(18, 20, 32, 0.95) 100%);
+  border-color: #9146ff;
+  box-shadow: 0 0 20px rgba(145, 70, 255, 0.35);
+}
+
+.tab-nav-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #9146ff, #ffd700);
+}
+
+.tab-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.tab-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tab-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.tab-nav-btn.active .tab-title {
+  color: #ffd700;
+}
+
+.tab-sub {
+  font-size: 11px;
+  color: #8c8ea0;
+}
+
+/* Contenedor de contenido de pestaña */
+.tab-content-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px 60px 16px;
+}
+
+.tab-pane-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeInPane 0.25s ease forwards;
+}
+
+@keyframes fadeInPane {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.connect-pane {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.slot-pane {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.cooldown-pane {
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+/* Tarjeta de Alerta de Token / Autenticación */
+.auth-alert-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: linear-gradient(135deg, rgba(255, 68, 68, 0.12) 0%, rgba(255, 140, 0, 0.08) 100%);
+  border: 1px solid rgba(255, 68, 68, 0.4);
+  border-radius: 18px;
+  padding: 18px 22px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.auth-alert-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.auth-alert-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.auth-alert-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ff5555;
+}
+
+.auth-alert-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #d1d2dc;
+  line-height: 1.5;
+}
+
+.auth-alert-desc code {
+  color: #ffd700;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.auth-alert-solution {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #e2e4f0;
+}
+
+.auth-alert-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.btn-token-action {
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-token-action.primary {
+  background: #9146ff;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(145, 70, 255, 0.5);
+}
+
+.btn-token-action.primary:hover {
+  background: #772ce8;
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px rgba(145, 70, 255, 0.7);
+}
+
+.btn-token-action.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #c7c8d6;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-token-action.secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* Tarjeta de Éxito de Autenticación */
+.auth-success-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.12) 0%, rgba(0, 255, 136, 0.04) 100%);
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  border-radius: 18px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.auth-success-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.auth-success-body h4 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #00ff88;
+}
+
+.auth-success-body p {
+  margin: 0;
+  font-size: 12px;
+  color: #c7c8d6;
+  line-height: 1.4;
+}
+
+.auth-success-body code {
+  color: #ffd700;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* Botones de acción y pie de página de pestaña */
+.form-actions-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-quick-token {
+  color: #00f0ff;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 240, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  transition: all 0.15s ease;
+}
+
+.btn-quick-token:hover {
+  background: rgba(0, 240, 255, 0.2);
+  border-color: #00f0ff;
+}
+
+.btn-next-tab {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #ffd700;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-next-tab:hover {
+  background: rgba(255, 215, 0, 0.12);
+  border-color: #ffd700;
+  transform: translateX(2px);
+}
+
+.tab-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+/* ==========================================================================
    SISTEMA DE 8 TEMAS ÚNICOS PARA LA RULETA "RUDZY FEST"
    ========================================================================== */
 

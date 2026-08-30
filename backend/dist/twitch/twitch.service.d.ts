@@ -18,6 +18,7 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     private readonly logger;
     private client;
     private isAuthenticated;
+    private authError;
     private currentChannel;
     private currentBotUsername;
     private currentOauthToken;
@@ -79,6 +80,7 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
         botUsername: string;
         oauthToken: string;
         isAuthenticated: boolean;
+        authError: string;
         isSpinActive: boolean;
         cooldownSeconds: number;
         pointsCommand: string;

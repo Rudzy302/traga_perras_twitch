@@ -31,13 +31,14 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TwitchService.name);
   private client: tmi.Client | null = null;
   private isAuthenticated = false;
+  private authError: string | null = null;
 
   private currentChannel = '';
   private currentBotUsername = '';
   private currentOauthToken = '';
   private pointsCommandPattern = '!points add {user} {prize}';
   private currentTheme = 'carnival-green';
-  private announceCountdownInChat = false;
+  private announceCountdownInChat = true;
 
   // Configuración de tiempos
   private readonly SPIN_DURATION_MS = 15500; // 15.5s (tragaperras dura 15s)
@@ -196,7 +197,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
             this.pointsCommandPattern = parsed.pointsCommand || '!points add {user} {prize}';
             this.cooldownMs = (Number(parsed.cooldownSeconds) || 300) * 1000;
             this.currentTheme = parsed.theme || 'carnival-green';
-            this.announceCountdownInChat = parsed.announceCountdown === true;
+            this.announceCountdownInChat = parsed.announceCountdown !== undefined ? Boolean(parsed.announceCountdown) : true;
             this.logger.log(`📂 [Config Cargada desde JSON ${p}]: Canal #${this.currentChannel} | Cooldown ${parsed.cooldownSeconds}s`);
             return;
           }
@@ -228,7 +229,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
             this.pointsCommandPattern = envMap.POINTS_COMMAND || '!points add {user} {prize}';
             this.cooldownMs = (Number(envMap.COOLDOWN_SECONDS) || 300) * 1000;
             this.currentTheme = envMap.THEME || 'carnival-green';
-            this.announceCountdownInChat = envMap.ANNOUNCE_COUNTDOWN === 'true';
+            this.announceCountdownInChat = envMap.ANNOUNCE_COUNTDOWN !== undefined ? envMap.ANNOUNCE_COUNTDOWN === 'true' : true;
             this.logger.log(`📂 [Config Cargada desde .env ${p}]: Canal #${this.currentChannel}`);
             return;
           }
@@ -243,7 +244,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
     this.cooldownMs = (Number(process.env.COOLDOWN_SECONDS) || 300) * 1000;
     this.currentTheme = 'carnival-green';
-    this.announceCountdownInChat = false;
+    this.announceCountdownInChat = true;
   }
 
   private async disconnectFromTwitch(): Promise<void> {
@@ -267,7 +268,8 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const cleanChannel = this.currentChannel.replace(/^#/, '');
+    const cleanChannel = this.currentChannel.replace(/^#/, '').toLowerCase().trim();
+    const botNick = (this.currentBotUsername || cleanChannel).replace(/^@/, '').toLowerCase().trim();
 
     // Formatear token si viene sin el prefijo 'oauth:'
     let formattedToken = (this.currentOauthToken || '').trim();
@@ -282,18 +284,17 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
 
     if (formattedToken && formattedToken.length > 6) {
       // MODO AUTENTICADO: Lee el chat y puede enviar comandos (!points add ...)
-      const botNick = this.currentBotUsername || cleanChannel;
       clientOptions.identity = {
         username: botNick,
         password: formattedToken,
       };
-      this.isAuthenticated = true;
       this.logger.log(
         `🔐 Conectando a Twitch en MODO AUTENTICADO como @${botNick} en #${cleanChannel}...`,
       );
     } else {
       // MODO SÓLO LECTURA: Permite que la ruleta visual funcione escuchando !spin sin pagar puntos
       this.isAuthenticated = false;
+      this.authError = 'No se ha configurado Token OAuth';
       this.logger.warn(
         `👁️ Conectando a Twitch en MODO SÓLO LECTURA anónimo en #${cleanChannel} (Sin Token OAuth). La ruleta visual funcionará pero no podrá enviar comandos de puntos.`,
       );
@@ -308,6 +309,10 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
 
       this.client.on('connected', (addr, port) => {
         this.logger.log(`✅ [Twitch IRC Conectado] en ${addr}:${port} | Canal: #${cleanChannel}`);
+        if (clientOptions.identity) {
+          this.isAuthenticated = true;
+          this.authError = null;
+        }
         this.casinoGateway.emitTwitchStatus(this.getStatus());
       });
 
@@ -321,7 +326,16 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`❌ Error al conectar con Twitch: ${error.message || error}`);
       this.isAuthenticated = false;
+      this.authError = error.message || 'Token inválido o expirado. Genera uno nuevo en twitchapps.com/tmi';
       this.casinoGateway.emitTwitchStatus(this.getStatus());
+
+      // Fallback a conexión anónima para que la ruleta visual en OBS no quede desconectada
+      try {
+        this.client = new tmi.Client({ channels: [cleanChannel] });
+        this.client.on('message', (ch, tags, msg) => this.handleChatMessage(ch, tags, msg));
+        await this.client.connect();
+        this.logger.log(`👁️ Conectado en MODO SÓLO LECTURA anónimo en #${cleanChannel}`);
+      } catch {}
     }
   }
 
@@ -762,6 +776,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       botUsername: this.currentBotUsername,
       oauthToken: this.currentOauthToken,
       isAuthenticated: this.isAuthenticated,
+      authError: this.authError,
       isSpinActive: this.isSpinActive,
       cooldownSeconds: Math.round(this.cooldownMs / 1000),
       pointsCommand: this.pointsCommandPattern,

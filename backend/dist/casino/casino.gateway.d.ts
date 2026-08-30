@@ -30,6 +30,7 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         botUsername: string;
         oauthToken: string;
         isAuthenticated: boolean;
+        authError: string;
         isSpinActive: boolean;
         cooldownSeconds: number;
         pointsCommand: string;
