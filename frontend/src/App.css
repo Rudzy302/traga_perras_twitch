@@ -2907,6 +2907,230 @@ body.overlay-mode {
 }
 
 /* ==========================================================================
+   BARRA DE ESTILO VISUAL (DROPDOWN SELECT) Y PRUEBAS EN LÍNEA
+   ========================================================================== */
+.card-style-bar {
+  background: rgba(18, 20, 32, 0.9) !important;
+  border: 1px solid rgba(255, 215, 0, 0.25) !important;
+  border-radius: 18px !important;
+  padding: 14px 20px !important;
+}
+
+.style-bar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.theme-dropdown-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.theme-dropdown-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffd700;
+  white-space: nowrap;
+}
+
+.theme-dropdown-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.theme-dropdown-select {
+  background: #0d0f1a;
+  color: #fff;
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.theme-dropdown-select:hover,
+.theme-dropdown-select:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.35);
+}
+
+.theme-dropdown-select option {
+  background: #141724;
+  color: #fff;
+  padding: 8px;
+}
+
+.theme-current-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.5);
+}
+
+.quick-test-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.test-pills-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stage-subtitle-hint {
+  font-size: 11px;
+  color: #8c8ea0;
+  font-style: italic;
+}
+
+/* ==========================================================================
+   PESTAÑA DE PRÓXIMOS JUEGOS MULTIJUGADOR / STREAM
+   ========================================================================== */
+.games-pane {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.card-more-games-intro {
+  background: rgba(18, 20, 32, 0.9) !important;
+  border: 1px solid rgba(145, 70, 255, 0.3) !important;
+  border-radius: 22px !important;
+  padding: 28px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.more-games-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.future-badge {
+  background: linear-gradient(135deg, #9146ff, #00f0ff);
+  color: #0c0e18;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 12px;
+  border-radius: 20px;
+  align-self: flex-start;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.more-games-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.more-games-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #a0a2b4;
+  line-height: 1.5;
+}
+
+.games-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.game-teaser-card {
+  display: flex;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.game-teaser-card:hover {
+  border-color: rgba(145, 70, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.game-teaser-icon {
+  font-size: 34px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-teaser-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.game-teaser-body h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #e4e4eb;
+}
+
+.game-teaser-body p {
+  margin: 0;
+  font-size: 12px;
+  color: #8c8ea0;
+  line-height: 1.4;
+}
+
+.game-status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: #ffd700;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  padding: 2px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.future-note-box {
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px dashed rgba(0, 240, 255, 0.3);
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 12px;
+  color: #00f0ff;
+}
+
+/* ==========================================================================
    SISTEMA DE 8 TEMAS ÚNICOS PARA LA RULETA "RUDZY FEST"
    ========================================================================== */
 

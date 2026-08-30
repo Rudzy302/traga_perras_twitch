@@ -18,7 +18,7 @@ export interface TwitchStatusPayload {
 
 const LOCAL_STORAGE_KEY = 'casino_streamer_config_v1';
 
-export type DashboardTab = 'connect' | 'slot' | 'cooldown';
+export type DashboardTab = 'connect' | 'rudzy-fest' | 'more-games';
 
 export const StreamerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('connect');
@@ -313,6 +313,7 @@ export const StreamerDashboard: React.FC = () => {
 
   const isAuth = Boolean(twitchStatus?.isAuthenticated);
   const isSpinning = Boolean(twitchStatus?.isSpinActive);
+  const currentThemeMeta = THEMES_LIST.find((t) => t.id === selectedTheme) || THEMES_LIST[0];
 
   return (
     <div className="streamer-dashboard-container">
@@ -321,8 +322,8 @@ export const StreamerDashboard: React.FC = () => {
         <div className="header-left">
           <span className="brand-badge">🎰</span>
           <div className="brand-titles">
-            <h1>RUDZY FEST - RULETA TWITCH</h1>
-            <span className="brand-subtitle">Panel de Control & Configuración OBS</span>
+            <h1>RUDZY FEST - CASINO & RULETA TWITCH</h1>
+            <span className="brand-subtitle">Panel de Control Multijuegos & Overlays para OBS</span>
           </div>
         </div>
 
@@ -347,7 +348,7 @@ export const StreamerDashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Barra de Navegación por Pestañas / Secciones Claras */}
+      {/* Barra de Navegación por Pestañas Claras (Preparada para nuevos juegos) */}
       <nav className="dashboard-tabs-nav">
         <button
           type="button"
@@ -363,25 +364,25 @@ export const StreamerDashboard: React.FC = () => {
 
         <button
           type="button"
-          className={`tab-nav-btn ${activeTab === 'slot' ? 'active' : ''}`}
-          onClick={() => setActiveTab('slot')}
+          className={`tab-nav-btn ${activeTab === 'rudzy-fest' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rudzy-fest')}
         >
           <span className="tab-icon">🎰</span>
           <div className="tab-label-group">
-            <span className="tab-title">2. Tragaperras & OBS</span>
-            <span className="tab-sub">Rudzy Fest, Temas y URL</span>
+            <span className="tab-title">2. Ruleta Rudzy Fest</span>
+            <span className="tab-sub">Tragaperras, OBS, Estilos & Cooldown</span>
           </div>
         </button>
 
         <button
           type="button"
-          className={`tab-nav-btn ${activeTab === 'cooldown' ? 'active' : ''}`}
-          onClick={() => setActiveTab('cooldown')}
+          className={`tab-nav-btn ${activeTab === 'more-games' ? 'active' : ''}`}
+          onClick={() => setActiveTab('more-games')}
         >
-          <span className="tab-icon">⏱️</span>
+          <span className="tab-icon">✨</span>
           <div className="tab-label-group">
-            <span className="tab-title">3. Cooldown & Chat</span>
-            <span className="tab-sub">Tiempos y Avisos 3, 2, 1...</span>
+            <span className="tab-title">3. Próximos Juegos (+)</span>
+            <span className="tab-sub">Catálogo en desarrollo</span>
           </div>
         </button>
       </nav>
@@ -623,9 +624,9 @@ export const StreamerDashboard: React.FC = () => {
                   <button
                     type="button"
                     className="btn-next-tab"
-                    onClick={() => setActiveTab('slot')}
+                    onClick={() => setActiveTab('rudzy-fest')}
                   >
-                    👉 Ver Tragaperras & OBS (Paso 2)
+                    👉 Ir a la Ruleta Rudzy Fest (Paso 2)
                   </button>
                 </div>
               </form>
@@ -634,9 +635,9 @@ export const StreamerDashboard: React.FC = () => {
         )}
 
         {/* =========================================================================
-            PESTAÑA 2: TRAGAPERRAS RUDZY FEST & OBS STUDIO
+            PESTAÑA 2: RULETA RUDZY FEST (Tragaperras, OBS, Estilos & Cooldown Integrados)
             ========================================================================= */}
-        {activeTab === 'slot' && (
+        {activeTab === 'rudzy-fest' && (
           <div className="tab-pane-container slot-pane">
             {/* Card de OBS Overlay */}
             <div className="dash-card card-obs-link">
@@ -683,34 +684,72 @@ export const StreamerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Selector de Temas Visuales (8 Temas) */}
-            <div className="dash-card card-themes-selector">
-              <div className="themes-header">
-                <h3>🎨 Elige el Tema Visual de Rudzy Fest</h3>
-                <span className="themes-count">8 Estilos Exclusivos Disponibles</span>
-              </div>
-
-              <div className="themes-grid">
-                {THEMES_LIST.map((theme) => {
-                  const isSelected = selectedTheme === theme.id;
-                  return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      className={`theme-card-btn ${isSelected ? 'active' : ''}`}
-                      onClick={() => handleSelectTheme(theme.id)}
+            {/* Barra Compacta de Selector de Estilo (Dropdown Select) & Pruebas */}
+            <div className="dash-card card-style-bar">
+              <div className="style-bar-content">
+                {/* Selector Dropdown de Estilo Visual */}
+                <div className="theme-dropdown-group">
+                  <label htmlFor="theme-select-picker" className="theme-dropdown-label">
+                    🎨 Estilo Visual de la Ruleta:
+                  </label>
+                  <div className="theme-dropdown-control">
+                    <select
+                      id="theme-select-picker"
+                      value={selectedTheme}
+                      onChange={(e) => handleSelectTheme(e.target.value as SlotTheme)}
+                      className="theme-dropdown-select"
                     >
-                      <div className="theme-preview-palette" style={{ background: theme.colorPreview }}>
-                        <span className="theme-card-icon">{theme.icon}</span>
-                      </div>
-                      <div className="theme-info">
-                        <span className="theme-name">{theme.name}</span>
-                        <span className="theme-desc">{theme.subtitle}</span>
-                      </div>
-                      {isSelected && <span className="theme-badge-selected">✓ ACTIVO</span>}
+                      {THEMES_LIST.map((theme) => (
+                        <option key={theme.id} value={theme.id}>
+                          {theme.icon} {theme.name} — {theme.tag}
+                        </option>
+                      ))}
+                    </select>
+                    <div
+                      className="theme-current-badge"
+                      style={{ background: currentThemeMeta.colorPreview }}
+                      title={currentThemeMeta.subtitle}
+                    >
+                      <span>{currentThemeMeta.icon}</span>
+                      <strong>{currentThemeMeta.name}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botones de Prueba Rápida de Tiradas */}
+                <div className="quick-test-inline">
+                  <span className="test-bar-label">Probar Tirada:</span>
+                  <div className="test-pills-row">
+                    <button
+                      type="button"
+                      className="btn-prize-pill"
+                      onClick={() => handleTriggerTest(50, 'Viewer50')}
+                    >
+                      🎰 50 pts
                     </button>
-                  );
-                })}
+                    <button
+                      type="button"
+                      className="btn-prize-pill"
+                      onClick={() => handleTriggerTest(500, 'Viewer500')}
+                    >
+                      ⭐ 500 pts
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-prize-pill"
+                      onClick={() => handleTriggerTest(2500, 'Viewer2500')}
+                    >
+                      💎 2,500 pts
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-prize-pill jackpot-pill"
+                      onClick={() => handleTriggerTest(100000, 'JACKPOT_WINNER')}
+                    >
+                      🔥 ¡100,000 pts!
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -719,40 +758,9 @@ export const StreamerDashboard: React.FC = () => {
               <div className="stage-header-bar">
                 <div className="stage-title">
                   <span className="stage-dot" />
-                  <h4>Vista Previa de la Máquina en Pantalla</h4>
+                  <h4>Escenario en Vivo: Rudzy Fest ({currentThemeMeta.name})</h4>
                 </div>
-
-                <div className="quick-test-bar">
-                  <span className="test-bar-label">Probar Tirada:</span>
-                  <button
-                    type="button"
-                    className="btn-prize-pill"
-                    onClick={() => handleTriggerTest(50, 'Viewer50')}
-                  >
-                    🎰 50 pts
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-prize-pill"
-                    onClick={() => handleTriggerTest(500, 'Viewer500')}
-                  >
-                    ⭐ 500 pts
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-prize-pill"
-                    onClick={() => handleTriggerTest(2500, 'Viewer2500')}
-                  >
-                    💎 2,500 pts
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-prize-pill jackpot-pill"
-                    onClick={() => handleTriggerTest(100000, 'JACKPOT_WINNER')}
-                  >
-                    🔥 ¡100,000 pts!
-                  </button>
-                </div>
+                <span className="stage-subtitle-hint">{currentThemeMeta.subtitle}</span>
               </div>
 
               <div className="stage-canvas-wrapper">
@@ -760,30 +768,15 @@ export const StreamerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Botón para ir al paso 3 */}
-            <div className="tab-footer-actions">
-              <button
-                type="button"
-                className="btn-next-tab"
-                onClick={() => setActiveTab('cooldown')}
-              >
-                👉 Configurar Cooldown y Avisos en Chat (Paso 3)
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* =========================================================================
-            PESTAÑA 3: COOLDOWN & AVISOS EN EL CHAT (3, 2, 1...)
-            ========================================================================= */}
-        {activeTab === 'cooldown' && (
-          <div className="tab-pane-container cooldown-pane">
+            {/* =========================================================================
+                SECCIÓN DE COOLDOWN & AVISOS EN CHAT (Integrada en la misma pestaña)
+                ========================================================================= */}
             <div className="dash-card card-cooldown-control">
               <div className="cooldown-card-header">
                 <div className="cooldown-title-group">
                   <span className="cooldown-icon">⏱️</span>
                   <div>
-                    <h3 className="cooldown-title">Tiempo de Espera entre Ruletas (Cooldown)</h3>
+                    <h3 className="cooldown-title">Tiempo de Espera (Cooldown) & Avisos en Chat</h3>
                     <p className="cooldown-desc">
                       Define cuánto tiempo debe transcurrir antes de que otro espectador pueda volver a activar la ruleta con <code>!spin</code>.
                     </p>
@@ -846,7 +839,7 @@ export const StreamerDashboard: React.FC = () => {
 
               {/* Ajuste personalizado */}
               <div className="cooldown-custom-row">
-                <span className="custom-cd-label">Ajuste personalizado en segundos:</span>
+                <span className="custom-cd-label">Ajuste manual en segundos:</span>
                 <div className="cd-stepper-wrap">
                   <button
                     type="button"
@@ -894,7 +887,7 @@ export const StreamerDashboard: React.FC = () => {
                   </span>
                 </label>
                 <span className="toggle-checkbox-hint">
-                  Tu cuenta de streamer enviará automáticamente un conteo al chat de Twitch cuando el cooldown esté por terminar para que los viewers se preparen para el próximo <code>!spin</code>.
+                  Tu cuenta de streamer enviará automáticamente el conteo al chat de Twitch cuando el cooldown esté por terminar para que los viewers se preparen para el próximo <code>!spin</code>.
                 </span>
               </div>
 
@@ -916,6 +909,77 @@ export const StreamerDashboard: React.FC = () => {
                 >
                   🔄 Resetear Cooldown Inmediatamente
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            PESTAÑA 3: PRÓXIMOS JUEGOS (+) (Arquitectura Multijuegos a Futuro)
+            ========================================================================= */}
+        {activeTab === 'more-games' && (
+          <div className="tab-pane-container games-pane">
+            <div className="dash-card card-more-games-intro">
+              <div className="more-games-header">
+                <span className="future-badge">🚀 Próximamente</span>
+                <h2>Catálogo de Minijuegos para tu Stream</h2>
+                <p>
+                  Esta arquitectura modular permite integrar nuevos juegos interactivos que tus espectadores podrán canjear con puntos de canal o BotRix.
+                </p>
+              </div>
+
+              <div className="games-preview-grid">
+                {/* Juego 1: Coinflip */}
+                <div className="game-teaser-card">
+                  <div className="game-teaser-icon">🪙</div>
+                  <div className="game-teaser-body">
+                    <h3>Lanzamiento de Moneda (Coinflip)</h3>
+                    <p>
+                      Doble o nada animado en pantalla para duelos entre viewers o apuestas rápidas con el streamer.
+                    </p>
+                    <span className="game-status-badge">En desarrollo</span>
+                  </div>
+                </div>
+
+                {/* Juego 2: Ruleta de la Fortuna */}
+                <div className="game-teaser-card">
+                  <div className="game-teaser-icon">🎡</div>
+                  <div className="game-teaser-body">
+                    <h3>La Rueda de la Fortuna (Lucky Wheel)</h3>
+                    <p>
+                      Ruleta circular gigante personalizable con retos de stream, multiplicadores y castigos divertidos.
+                    </p>
+                    <span className="game-status-badge">En desarrollo</span>
+                  </div>
+                </div>
+
+                {/* Juego 3: Cofre del Tesoro */}
+                <div className="game-teaser-card">
+                  <div className="game-teaser-icon">📦</div>
+                  <div className="game-teaser-body">
+                    <h3>Cajas Sorpresa (Mystery Box)</h3>
+                    <p>
+                      Apertura de cofres animados en 3D con cartas y recompensas coleccionables para tus suscriptores.
+                    </p>
+                    <span className="game-status-badge">Planeado</span>
+                  </div>
+                </div>
+
+                {/* Juego 4: Blackjack Twitch */}
+                <div className="game-teaser-card">
+                  <div className="game-teaser-icon">🃏</div>
+                  <div className="game-teaser-body">
+                    <h3>Blackjack 21 Twitch</h3>
+                    <p>
+                      Mesa interactiva de cartas contra la casa controlada directamente por comandos del chat.
+                    </p>
+                    <span className="game-status-badge">Planeado</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="future-note-box">
+                <span>💡 Cada nuevo juego que se agregue tendrá su propia URL limpia para OBS y sus propios comandos de BotRix independientes.</span>
               </div>
             </div>
           </div>
