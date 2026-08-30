@@ -1,0 +1,157 @@
+================================================================================
+🎰 GUÍA COMPLETA: INTEGRACIÓN DE CASINO Y RULETA PARA CUALQUIER STREAMER DE TWITCH
+================================================================================
+
+Esta ruleta interactiva está lista para ser utilizada por CUALQUIER streamer de Twitch.
+Cuenta con un Ejecutable Nativo de Windows (casino.exe) y soporte para desplegar en Vercel,
+por lo que no necesitas tocar archivos .env ni saber de programación.
+
+--------------------------------------------------------------------------------
+1. REQUISITO PREVIO (Solo se instala una vez en tu PC)
+--------------------------------------------------------------------------------
+Para ejecutar el servidor local en tu PC necesitas tener instalado Node.js:
+
+1. Ve a la página oficial: 👉 https://nodejs.org/
+2. Descarga e instala la versión recomendada "LTS".
+3. Durante la instalación, haz clic en "Siguiente" a todo hasta finalizar.
+
+--------------------------------------------------------------------------------
+2. CÓMO INICIAR EL PROGRAMA (Con un solo clic en casino.exe)
+--------------------------------------------------------------------------------
+En la carpeta principal del proyecto encontrarás el archivo:
+
+👉 casino.exe
+
+1. Haz doble clic sobre "casino.exe".
+2. Se iniciará el sistema automáticamente (comprueba dependencias, compila y arranca el backend).
+3. En unos segundos, se abrirá AUTOMÁTICAMENTE tu navegador en:
+   👉 http://localhost:3000
+
+(Mantén la ventana de casino.exe abierta mientras estés en directo para que escuche tu chat).
+
+--------------------------------------------------------------------------------
+3. CÓMO ENLAZAR TU CUENTA DE TWITCH (Sin tocar archivos .env)
+--------------------------------------------------------------------------------
+En la pantalla que se abre en tu navegador (pestaña "⚙️ Configurar Cuenta de Twitch"):
+
+Paso A: Ingresa tu Canal de Twitch
+- En el campo "Canal de Twitch", escribe tu usuario de Twitch donde transmites
+  (ejemplo: TuCanal).
+
+Paso B: Cuenta del Bot (Opcional)
+- Si vas a usar tu misma cuenta para entregar los puntos, puedes dejarlo igual.
+- Si tienes una cuenta bot secundaria (ejemplo: TuCanal_Bot), escribe su nombre aquí.
+
+Paso C: Obtén tu Token OAuth ("Encontrar mi token")
+- Justo arriba del campo del token verás el botón:
+  👉 "Encontrar mi token"
+  Haz clic en él. Te abrirá directamente la página de autorización de Twitch.
+- Inicia sesión con la cuenta que escribirá en el chat y autoriza la aplicación.
+- Copia el Token generado (ejemplo: oauth:2gb98a7sd6f5...) y pégalo en el campo.
+
+Paso D: Comando para Pagar Puntos
+- Selecciona el formato de comando que use tu bot de puntos:
+  * BotRix / StreamElements: !points add {user} {prize}
+  * Comando Corto: !p @{user} {prize}
+  * Personalizado: Puedes escribir cualquier comando con {user} y {prize}.
+
+Paso E: Guarda la Configuración
+- Haz clic en el botón dorado "💾 Guardar y Conectar a Twitch".
+- ¡Listo! En la esquina superior derecha verás el indicador verde:
+  🟢 CONECTADO A #TUCANAL (MODO AUTENTICADO).
+
+--------------------------------------------------------------------------------
+4. CÓMO AGREGAR LA RULETA TRANSPARENTE A OBS STUDIO
+--------------------------------------------------------------------------------
+1. Ve a la pestaña "🎰 Ruleta en Vivo & OBS" en tu panel.
+2. En la barra superior morada, haz clic en el botón:
+   "📋 Copiar URL para OBS"
+   (El enlace es: http://localhost:3000/?overlay=true).
+
+3. Abre OBS Studio en tu computadora.
+4. En la sección "Fuentes", haz clic en el botón "+" y selecciona "Navegador" (Browser).
+5. Nómbralo por ejemplo: "Ruleta Casino Twitch".
+6. En las propiedades de la fuente:
+   - URL: Pega http://localhost:3000/?overlay=true
+   - Ancho (Width): 1920
+   - Alto (Height): 1080
+   - Marca la casilla: "Controlar audio vía OBS" (para poder regular el volumen
+     de los sonidos de la tragaperras en tu mezclador de audio).
+7. Haz clic en "Aceptar".
+
+¡El overlay permanecerá 100% INVISIBLE en tu pantalla hasta que alguien juegue!
+
+--------------------------------------------------------------------------------
+5. CÓMO PROBAR QUE TODO FUNCIONA Y PERSONALIZAR TEMAS
+--------------------------------------------------------------------------------
+En el panel principal tienes:
+- Placa oficial: La ruleta muestra con orgullo el nombre "Rudzy Fest" en la marquesina superior.
+- Colección de 8 Temas Visuales Únicos:
+  1. 🎪 Carnaval Vintage: Chasis verde esmeralda, latón biselado y bombillas de feria circense.
+  2. 👑 Oro Real Casino: Ébano negro, molduras de oro 24k y diamantes LED facetados.
+  3. ⚡ Cyber Synthwave: Fibra de carbono, tubos de neón magenta y cian con rejilla láser.
+  4. 🔥 Infierno Arcade: Metal forjado volcánico, brasas ardientes y remaches de acero.
+  5. ❄️ Glaciar Ártico: Zafiro polar translúcido, escarcha de cristal y luces aurora.
+  6. 🌴 Retro Miami 80s: Carcasa curvada CRT arcade, gradiente violeta-sunset y palmeras.
+  7. ⚙️ Steampunk Clockwork: Cobre martillado, engranajes victorianos y lámparas nixie.
+  8. 🌌 Cosmos Galáctico: Nebulosa amatista profunda, polvo estelar y orbes supernova.
+
+- Al elegir un tema en el panel, la URL para OBS se adapta automáticamente:
+  ejemplo: http://localhost:3000/?overlay=true&theme=cyber-neon
+- Botón "🎰 Probar Tirada": Lanza una tirada inmediata tanto en tu panel como en OBS.
+- Botones rápidos de premios: 50 pts, 500 pts, 2,500 pts y 🌟 100,000 pts (JACKPOT).
+- Modificador de Cooldown: Presets rápidos (10s, 30s, 1m, 2m, 5m, 10m) y ajuste en segundos.
+- Botón "📢 Probar Aviso en Chat": Dispara la cuenta regresiva en vivo en tu chat de Twitch (3, 2, 1...).
+- Botón "🔄 Resetear Cooldown Ahora": Reinicia el tiempo de espera inmediatamente.
+
+--------------------------------------------------------------------------------
+6. CÓMO FUNCIONA EN VIVO DURANTE TU STREAM
+--------------------------------------------------------------------------------
+Flujo automático:
+1. Un espectador escribe en tu chat !ruleta (o canjea la ruleta en tu tienda de BotRix).
+2. El bot detecta el mensaje y la ruleta aparece en pantalla en OBS girando durante 15s.
+3. A los 14.5s la ruleta se detiene de golpe en el premio obtenido.
+4. A los 16s exactos, tu bot envía automáticamente al chat el comando de pago:
+   ej: !points add Pepe 500
+5. La ruleta se desvanece suavemente a los 21s y queda invisible hasta la próxima tirada.
+6. Cuenta regresiva automática para mayor emoción:
+   Cuando el tiempo de cooldown esté a punto de finalizar, el streamer/bot enviará automáticamente al chat:
+   - ⏳ ¡La ruleta estará disponible en 3...
+   - ⏳ ¡La ruleta estará disponible en 2...
+   - ⏳ ¡La ruleta estará disponible en 1...
+   - 🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨
+
+--------------------------------------------------------------------------------
+7. DESPLIEGUE EN LA NUBE (CUALQUIER PLATAFORMA / HOSTING)
+--------------------------------------------------------------------------------
+Si deseas desplegar el proyecto en internet para no tener que correrlo en local:
+
+1. Despliegue Unificado (Frontend + Backend en 1 Clic):
+   - El proyecto ya incluye "package.json" en la raíz, "Procfile" y "Dockerfile".
+   - Puedes subir este repositorio a plataformas PaaS como:
+     * Railway (https://railway.app)
+     * Render (https://render.com)
+     * Fly.io (https://fly.io)
+     * Heroku, Dokku, Coolify o cualquier servidor VPS con Docker.
+   - La plataforma detectará automáticamente Node.js o el Dockerfile, ejecutará
+     "npm run build" y "npm start", sirviendo tanto la ruleta visual como la conexión
+     de chat de Twitch 24/7 en una sola URL pública (ejemplo: https://mi-casino.up.railway.app).
+
+2. En Local con casino.exe (Recomendado para cualquier streamer):
+   - No necesitas pagar ni configurar servidores en la nube.
+   - Solo abres "casino.exe" en tu computadora cuando vayas a prender directo y listo.
+
+--------------------------------------------------------------------------------
+8. PREGUNTAS FRECUENTES
+--------------------------------------------------------------------------------
+* ¿Cómo apago el programa?
+  Simplemente cierra la ventana de "casino.exe".
+
+* ¿Tengo que configurar mi token cada vez que abra casino.exe?
+  No. Tus datos se guardan de forma automática en tu PC.
+  La próxima vez que abras casino.exe recordará tu canal y token.
+
+* ¿Puedo cambiar de canal en el futuro?
+  Sí. Solo ve a la pestaña "Configurar Cuenta de Twitch", ingresa los nuevos datos
+  y haz clic en "Guardar y Conectar".
+================================================================================

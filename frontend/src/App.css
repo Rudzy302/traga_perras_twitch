@@ -1,0 +1,3323 @@
+/* ==========================================================================
+   TWITCH CASINO OVERLAY - ESTILOS OBS DE ALTA DEFINICIÓN
+   Transparencia total, Neón Dorado y Efectos Visuales Cyber-Casino
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700;800&family=Inter:wght@400;600;800&display=swap');
+
+:root {
+  --gold-primary: #ffd700;
+  --gold-bright: #fff066;
+  --gold-shadow: #b8860b;
+  --neon-purple: #9d4edd;
+  --neon-cyan: #00f0ff;
+  --neon-red: #ff0055;
+  --dark-chassis: rgba(12, 14, 28, 0.94);
+  --dark-bezel: #1a1c2e;
+  --bezel-metallic: linear-gradient(145deg, #2e3250, #131524);
+}
+
+/* Reset y Transparencia Absoluta para OBS Browser Source */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  font-family: 'Rajdhani', 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.overlay-mode,
+body.overlay-mode #root {
+  width: 100vw;
+  height: 100vh;
+  background: transparent !important;
+  overflow: hidden;
+  user-select: none;
+}
+
+body.dashboard-mode {
+  background: #0b0c10 !important;
+  color: #efeff1;
+  min-height: 100vh;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  user-select: auto;
+}
+
+body.dashboard-mode #root {
+  min-height: 100vh;
+  height: auto !important;
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   ESTADO IDLE / BOTÓN DISCRETO DE PRUEBA LOCAL
+   -------------------------------------------------------------------------- */
+.slot-machine-idle-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.dev-test-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 17, 30, 0.85);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 30px;
+  padding: 6px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  opacity: 0.25;
+  transition: opacity 0.3s ease;
+}
+
+.dev-test-panel:hover {
+  opacity: 1;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.status-dot.online {
+  background-color: #00ff88;
+  color: #00ff88;
+}
+
+.status-dot.offline {
+  background-color: #ff3344;
+  color: #ff3344;
+}
+
+.status-text {
+  color: #a0aec0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.test-audio-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s ease;
+}
+
+.test-audio-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.test-spin-btn {
+  background: linear-gradient(135deg, #ffd700, #ff8800);
+  border: none;
+  border-radius: 20px;
+  color: #000;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 4px 12px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.test-spin-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+}
+
+/* --------------------------------------------------------------------------
+   WRAPPER PRINCIPAL DEL OVERLAY (Animación de Entrada en OBS)
+   -------------------------------------------------------------------------- */
+.slot-machine-overlay-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  animation: overlayEntrance 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes overlayEntrance {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   CHASIS DE LA MÁQUINA TRAGAMONEDAS / CONTADOR DIGITAL
+   -------------------------------------------------------------------------- */
+.slot-machine-card {
+  position: relative;
+  width: 440px;
+  background: var(--dark-chassis);
+  border: 3px solid #ffd700;
+  border-radius: 24px;
+  padding: 24px 20px;
+  box-sizing: border-box;
+  box-shadow: 
+    0 0 30px rgba(255, 215, 0, 0.3),
+    0 20px 60px rgba(0, 0, 0, 0.9),
+    inset 0 0 20px rgba(255, 215, 0, 0.15);
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+/* Estado de giro activo */
+.slot-machine-card.spinning-active {
+  box-shadow: 
+    0 0 45px rgba(0, 240, 255, 0.4),
+    0 20px 60px rgba(0, 0, 0, 0.9),
+    inset 0 0 25px rgba(0, 240, 255, 0.2);
+  border-color: var(--neon-cyan);
+}
+
+/* Estado de ganador alcanzado */
+.slot-machine-card.winner-active {
+  animation: winnerCardPulse 1.2s infinite alternate;
+  border-color: #ffffff;
+}
+
+@keyframes winnerCardPulse {
+  0% {
+    box-shadow: 
+      0 0 50px rgba(255, 215, 0, 0.8),
+      0 0 100px rgba(255, 170, 0, 0.4),
+      inset 0 0 30px rgba(255, 215, 0, 0.6);
+    border-color: #ffd700;
+  }
+  100% {
+    box-shadow: 
+      0 0 80px rgba(255, 255, 255, 0.9),
+      0 0 120px rgba(255, 215, 0, 0.7),
+      inset 0 0 40px rgba(255, 255, 255, 0.8);
+    border-color: #ffffff;
+    transform: scale(1.02);
+  }
+}
+
+/* Luces LED perimetrales */
+.chassis-leds {
+  display: flex;
+  justify-content: space-between;
+  width: 90%;
+  margin-bottom: 12px;
+}
+
+.chassis-leds.bottom-leds {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+.led-bulb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffd700;
+  box-shadow: 0 0 8px #ffd700;
+  animation: ledBlink 0.8s infinite alternate;
+}
+
+.led-bulb:nth-child(even) {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+  animation-delay: 0.4s;
+}
+
+@keyframes ledBlink {
+  0% { opacity: 0.3; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+/* --------------------------------------------------------------------------
+   CABECERA (Nombre de Usuario & Costo)
+   -------------------------------------------------------------------------- */
+.slot-header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.badge-casino {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(90deg, rgba(157, 78, 221, 0.3), rgba(255, 215, 0, 0.3));
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: 20px;
+  padding: 4px 16px;
+}
+
+.casino-icon {
+  font-size: 16px;
+}
+
+.casino-tag {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--gold-bright);
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+/* --------------------------------------------------------------------------
+   TARJETA DEL JUGADOR ("TIRADA POR PARTE DE")
+   -------------------------------------------------------------------------- */
+.spin-by-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 90%;
+  max-width: 380px;
+  box-sizing: border-box;
+  background: rgba(20, 22, 38, 0.9);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  padding: 8px 16px 10px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+}
+
+.spin-by-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #a8aab8;
+  margin-bottom: 2px;
+  line-height: 1.2;
+}
+
+.spin-by-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.spin-by-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.spin-by-username {
+  font-family: 'Rajdhani', 'Inter', sans-serif;
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #ffffff;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+  line-height: 1.2;
+}
+
+/* --------------------------------------------------------------------------
+   VENTANA DEL TRAGAMONEDAS / CONTADOR VERTICAL (VIEWPORT)
+   -------------------------------------------------------------------------- */
+.slot-viewport-frame {
+  position: relative;
+  width: 100%;
+  height: 250px;
+  background: #090a14;
+  border: 3px solid #2e3458;
+  border-radius: 18px;
+  box-shadow: 
+    inset 0 10px 25px rgba(0, 0, 0, 0.95),
+    inset 0 -10px 25px rgba(0, 0, 0, 0.95),
+    0 8px 24px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Indicadores de línea ganadora en los laterales (Payline Pointers) */
+.payline-marker {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  color: var(--gold-bright);
+  text-shadow: 0 0 12px var(--gold-primary);
+  z-index: 10;
+  animation: pointerPulse 0.6s infinite alternate;
+}
+
+.marker-left {
+  left: 8px;
+}
+
+.marker-right {
+  right: 8px;
+}
+
+@keyframes pointerPulse {
+  0% { transform: translateY(-50%) scale(0.9); opacity: 0.7; }
+  100% { transform: translateY(-50%) scale(1.2); opacity: 1; }
+}
+
+/* Efecto de curvatura cilíndrica 3D (Tambor de Ruleta) */
+.drum-vignette {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 70px;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.vignette-top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(9, 10, 20, 0.95), rgba(9, 10, 20, 0.4) 60%, transparent);
+}
+
+.vignette-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(9, 10, 20, 0.95), rgba(9, 10, 20, 0.4) 60%, transparent);
+}
+
+/* Barra láser central que marca la línea de cobro */
+.payline-laser-bar {
+  position: absolute;
+  top: 50%;
+  left: 30px;
+  right: 30px;
+  height: 72px;
+  transform: translateY(-50%);
+  background: rgba(255, 215, 0, 0.08);
+  border-top: 2px solid rgba(255, 215, 0, 0.4);
+  border-bottom: 2px solid rgba(255, 215, 0, 0.4);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.payline-laser-bar.laser-blast {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: #ffffff;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+  animation: laserPulse 0.4s infinite alternate;
+}
+
+@keyframes laserPulse {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+   COLUMNA VERTICAL DE NÚMEROS (Carrete / Drum Strip)
+   -------------------------------------------------------------------------- */
+.reel-vertical-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.1s ease;
+}
+
+/* Efecto de desenfoque de movimiento vertical a toda velocidad */
+.reel-vertical-strip.spinning-blur {
+  filter: blur(2.5px);
+  transform: scaleY(1.08);
+}
+
+/* IMPACTO SECO A LOS 14.5 SEGUNDOS (Frenado instantáneo con rebote elástico) */
+.reel-vertical-strip.slam-impact {
+  filter: blur(0);
+  animation: mechanicalSlam 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes mechanicalSlam {
+  0% {
+    transform: translateY(-28px) scale(1.1);
+  }
+  40% {
+    transform: translateY(12px) scale(0.98);
+  }
+  75% {
+    transform: translateY(-4px) scale(1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Filas individuales del carrete */
+.reel-slot-number {
+  height: 72px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.slot-prev,
+.slot-next {
+  opacity: 0.3;
+  transform: scale(0.8);
+}
+
+.slot-prev .point-val,
+.slot-next .point-val {
+  font-family: 'Orbitron', monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: #718096;
+}
+
+.pts-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #718096;
+  letter-spacing: 1px;
+}
+
+/* FILA CENTRAL DEL PREMIO GANADOR */
+.slot-winner-row {
+  z-index: 5;
+  transition: transform 0.2s ease;
+}
+
+.currency-symbol {
+  font-size: 32px;
+  filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.8));
+}
+
+.winner-number {
+  font-family: 'Orbitron', monospace;
+  font-size: 44px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 2px;
+  text-shadow: 
+    0 0 10px rgba(255, 215, 0, 0.6),
+    0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+/* DESTACADO EXPONENCIAL CUANDO SE REVELA EL PREMIO (A LOS 14.5s) */
+.slot-winner-row.prize-revealed .winner-number {
+  color: var(--gold-bright);
+  font-size: 50px;
+  text-shadow: 
+    0 0 20px #ffd700,
+    0 0 40px #ffaa00,
+    0 0 60px #ff5500;
+  animation: numberWinGlow 0.8s infinite alternate;
+}
+
+.slot-winner-row.prize-revealed .winner-label {
+  color: var(--gold-bright);
+  font-size: 16px;
+  font-weight: 900;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+@keyframes numberWinGlow {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.08); filter: brightness(1.3); }
+}
+
+/* --------------------------------------------------------------------------
+   PIE Y BANNER DE CELEBRACIÓN
+   -------------------------------------------------------------------------- */
+.slot-footer {
+  width: 100%;
+  margin-top: 16px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinning-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  border-radius: 20px;
+  padding: 6px 18px;
+}
+
+.spinner-radar-icon {
+  width: 12px;
+  height: 12px;
+  border: 2px solid transparent;
+  border-top-color: var(--neon-cyan);
+  border-right-color: var(--neon-cyan);
+  border-radius: 50%;
+  animation: radarSpin 0.5s linear infinite;
+}
+
+@keyframes radarSpin {
+  to { transform: rotate(360deg); }
+}
+
+.spinning-text {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  letter-spacing: 1.5px;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+}
+
+/* Banner de victoria al detenerse a los 14.5s */
+.winner-celebration-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: bannerSlideUp 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes bannerSlideUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.winner-stars {
+  font-size: 18px;
+  animation: starsBounce 0.6s infinite alternate;
+}
+
+@keyframes starsBounce {
+  from { transform: scale(0.9); }
+  to { transform: scale(1.15); }
+}
+
+.winner-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.winner-amount {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--gold-bright);
+  letter-spacing: 1px;
+  text-shadow: 
+    0 0 15px #ffd700,
+    0 0 30px #ff8800;
+}
+
+/* --------------------------------------------------------------------------
+   CAMPO DE DESTELLOS Y BRILLOS (Sparkle Particles)
+   -------------------------------------------------------------------------- */
+.sparkle-particles-field {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.gold-sparkle {
+  position: absolute;
+  color: #ffd700;
+  filter: drop-shadow(0 0 10px #ffd700);
+  animation: sparkleExplode 1.8s ease-out infinite;
+}
+
+@keyframes sparkleExplode {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.3) rotate(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.2) translateY(-80px) rotate(180deg);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   PANEL DE CONFIGURACIÓN MODAL Y ADVERTENCIA OAUTH
+   -------------------------------------------------------------------------- */
+.test-settings-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.test-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.oauth-warning-banner {
+  margin-top: 8px;
+  background: rgba(255, 60, 60, 0.85);
+  border: 1px solid #ff3344;
+  border-radius: 12px;
+  padding: 6px 14px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(255, 50, 50, 0.4);
+  backdrop-filter: blur(8px);
+  animation: pulseWarn 1.5s infinite alternate;
+}
+
+@keyframes pulseWarn {
+  from { opacity: 0.8; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.settings-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.settings-modal-card {
+  width: 480px;
+  background: #121424;
+  border: 2px solid #ffd700;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.4), 0 20px 50px rgba(0, 0, 0, 0.9);
+  color: #fff;
+}
+
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.settings-modal-header h3 {
+  margin: 0;
+  font-family: 'Orbitron', sans-serif;
+  color: #ffd700;
+  font-size: 18px;
+}
+
+.close-modal-btn {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.settings-desc {
+  font-size: 13px;
+  color: #cbd5e0;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.form-group input {
+  background: #1a1c30;
+  border: 1px solid #2e3458;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.token-help {
+  font-size: 11px;
+  color: #a0aec0;
+  line-height: 1.4;
+}
+
+.token-link {
+  color: #00f0ff;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.save-status-msg {
+  background: rgba(0, 255, 136, 0.2);
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #fff;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.btn-save {
+  background: linear-gradient(135deg, #ffd700, #ff8800);
+  border: none;
+  border-radius: 12px;
+  color: #000;
+  padding: 8px 20px;
+  cursor: pointer;
+  font-weight: 800;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+  transition: transform 0.15s ease;
+}
+
+.btn-save:hover {
+  transform: scale(1.04);
+}
+
+/* ==========================================================================
+   PANEL DE CONTROL DEL STREAMER (STREAMER DASHBOARD)
+   ========================================================================== */
+
+.dashboard-container {
+  min-height: 100vh;
+  background: radial-gradient(circle at 10% 20%, #151828 0%, #0a0b12 80%);
+  color: #e4e4eb;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 32px;
+  background: rgba(18, 20, 32, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-icon {
+  font-size: 32px;
+  filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.6));
+}
+
+.brand-titles h1 {
+  margin: 0;
+  font-family: 'Orbitron', 'Inter', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  background: linear-gradient(90deg, #ffd700, #ff9900);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-subtitle {
+  font-size: 12px;
+  color: #9146ff;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Badge de Conexión */
+.connection-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.connection-badge.connected {
+  border-color: rgba(0, 255, 136, 0.35);
+  background: rgba(0, 255, 136, 0.08);
+  color: #00ff88;
+}
+
+.connection-badge.disconnected {
+  border-color: rgba(255, 68, 68, 0.35);
+  background: rgba(255, 68, 68, 0.08);
+  color: #ff5555;
+}
+
+.pulse-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.btn-copy-obs {
+  background: linear-gradient(135deg, #9146ff, #6441a5);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(145, 70, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-copy-obs:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px rgba(145, 70, 255, 0.6);
+}
+
+.btn-copy-obs.copied {
+  background: linear-gradient(135deg, #00c853, #009624);
+  box-shadow: 0 0 16px rgba(0, 200, 83, 0.5);
+}
+
+/* Tabs */
+.dashboard-tabs {
+  display: flex;
+  gap: 12px;
+  padding: 16px 32px 0;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #8a8d9b;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: #e4e4eb;
+}
+
+.tab-btn.active {
+  color: #ffd700;
+  border-bottom-color: #ffd700;
+}
+
+/* Main Grid */
+.dashboard-main {
+  flex: 1;
+  padding: 24px 32px 48px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-col {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Cards */
+.dash-card {
+  background: rgba(18, 20, 32, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(14px);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 16px;
+}
+
+.card-header h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.card-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #8c8ea0;
+}
+
+.card-icon {
+  font-size: 26px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.twitch-icon {
+  background: rgba(145, 70, 255, 0.15);
+  box-shadow: 0 0 16px rgba(145, 70, 255, 0.2);
+}
+
+.test-icon {
+  background: rgba(255, 215, 0, 0.15);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.2);
+}
+
+.obs-icon {
+  background: rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.2);
+}
+
+/* Forms */
+.dash-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #d1d2dc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-field label .req {
+  color: #ff4444;
+}
+
+.form-field label .opt {
+  color: #717382;
+  font-size: 11px;
+}
+
+.token-security-badge {
+  font-size: 11px;
+  color: #00ff88;
+  font-weight: 600;
+  background: rgba(0, 255, 136, 0.1);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.input-with-prefix {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-with-prefix:focus-within {
+  border-color: #9146ff;
+  box-shadow: 0 0 0 3px rgba(145, 70, 255, 0.25);
+}
+
+.input-prefix {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #7d8093;
+  font-size: 14px;
+  font-weight: 600;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.input-with-prefix input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+.input-with-action {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-with-action:focus-within {
+  border-color: #9146ff;
+  box-shadow: 0 0 0 3px rgba(145, 70, 255, 0.25);
+}
+
+.input-with-action input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  font-family: monospace;
+}
+
+.btn-toggle-eye {
+  background: transparent;
+  border: none;
+  color: #8c8ea0;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: #717382;
+  line-height: 1.4;
+}
+
+/* Token Box */
+.token-generator-box {
+  background: rgba(145, 70, 255, 0.08);
+  border: 1px solid rgba(145, 70, 255, 0.25);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.gen-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c7a7ff;
+}
+
+.gen-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gen-btn {
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.gen-btn.primary {
+  background: #9146ff;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(145, 70, 255, 0.3);
+}
+
+.gen-btn.primary:hover {
+  background: #772ce8;
+  transform: translateY(-1px);
+}
+
+.gen-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e4e4eb;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.gen-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.perm-hint {
+  font-size: 11px;
+  color: #a8aab8;
+}
+
+/* Radio Cards */
+.radio-cards-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .radio-cards-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+.radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.radio-card input {
+  margin-top: 3px;
+  accent-color: #ffd700;
+}
+
+.radio-card.selected {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.08);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.15);
+}
+
+.radio-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.radio-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.radio-card-body code {
+  font-size: 10px;
+  color: #ffd700;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.radio-sub {
+  font-size: 11px;
+  color: #8c8ea0;
+}
+
+.custom-cmd-input-wrap {
+  margin-top: 8px;
+}
+
+.custom-cmd-input-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  border-radius: 12px;
+  color: #ffd700;
+  font-family: monospace;
+  outline: none;
+}
+
+/* Cooldown input */
+.cooldown-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cooldown-input-row input {
+  width: 120px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+.cooldown-label-min {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffd700;
+}
+
+/* Alert */
+.dash-alert {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-alert.success {
+  background: rgba(0, 255, 136, 0.12);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  color: #00ff88;
+}
+
+.dash-alert.error {
+  background: rgba(255, 68, 68, 0.12);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  color: #ff5555;
+}
+
+.dash-alert.info {
+  background: rgba(145, 70, 255, 0.12);
+  border: 1px solid rgba(145, 70, 255, 0.3);
+  color: #c7a7ff;
+}
+
+.btn-submit-save {
+  background: linear-gradient(135deg, #ffd700, #ff8800);
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0c0e1c;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4);
+  transition: all 0.2s ease;
+  margin-top: 6px;
+}
+
+.btn-submit-save:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 26px rgba(255, 215, 0, 0.6);
+}
+
+/* Panel de Pruebas */
+.test-controls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.test-inputs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.test-inputs-row input,
+.test-inputs-row select {
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+.test-buttons-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-test-spin {
+  flex: 1;
+  background: linear-gradient(135deg, #ffd700, #ff4500);
+  border: none;
+  border-radius: 12px;
+  color: #0c0e1c;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-test-spin:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.6);
+}
+
+.btn-reset-cd {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  color: #e4e4eb;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-reset-cd:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.status-summary-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sum-label {
+  font-size: 11px;
+  color: #717382;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.sum-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4eb;
+}
+
+.sum-val.ok {
+  color: #00ff88;
+}
+
+.sum-val.warn {
+  color: #ffd700;
+}
+
+/* Guía OBS */
+.obs-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.obs-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #9146ff;
+  color: #fff;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.step-content {
+  font-size: 13px;
+  color: #c7c8d6;
+  line-height: 1.5;
+}
+
+.obs-url-copy-box {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(145, 70, 255, 0.3);
+  border-radius: 10px;
+  padding: 6px 12px;
+  margin-top: 6px;
+  gap: 10px;
+}
+
+.obs-url-copy-box code {
+  color: #00f0ff;
+  font-family: monospace;
+  font-size: 12px;
+  flex: 1;
+  word-break: break-all;
+}
+
+.obs-url-copy-box button {
+  background: #9146ff;
+  border: none;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Vista Previa Tab */
+.preview-tab-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(18, 20, 32, 0.7);
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 700;
+}
+
+.preview-stage-wrapper {
+  min-height: 580px;
+  background: radial-gradient(circle at center, #1b1d2e 0%, #0c0e18 100%);
+  border: 1px dashed rgba(255, 215, 0, 0.3);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-idle-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.preview-idle-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #8c8ea0;
+}
+
+.preview-idle-box .idle-icon {
+  font-size: 48px;
+  filter: drop-shadow(0 0 16px rgba(255, 215, 0, 0.4));
+}
+
+.preview-idle-box h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+.preview-idle-box p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   ESTILOS DE OVERLAY 100% LIMPIO PARA OBS STUDIO
+   -------------------------------------------------------------------------- */
+body.overlay-mode {
+  background: transparent !important;
+  background-color: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.obs-overlay-main {
+  background: transparent !important;
+  background-color: transparent !important;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --------------------------------------------------------------------------
+   SISTEMA DE TEMÁTICAS DE LA MÁQUINA TRAGAPERRAS
+   -------------------------------------------------------------------------- */
+
+/* TEMA 1: CARNAVAL VERDE (VINTAGE EMERALD & GOLD) - POR DEFECTO */
+.theme-carnival-green .slot-machine-card {
+  background: radial-gradient(circle at 50% 30%, #0d4a27 0%, #082d17 60%, #04170c 100%) !important;
+  border: 4px solid #d4af37 !important;
+  border-radius: 26px !important;
+  box-shadow: 
+    0 0 35px rgba(212, 175, 55, 0.45),
+    0 25px 70px rgba(0, 0, 0, 0.95),
+    inset 0 0 30px rgba(212, 175, 55, 0.25) !important;
+}
+
+.theme-carnival-green .slot-machine-card.spinning-active {
+  border-color: #ffd700 !important;
+  box-shadow: 
+    0 0 55px rgba(255, 215, 0, 0.6),
+    0 25px 70px rgba(0, 0, 0, 0.95),
+    inset 0 0 35px rgba(255, 215, 0, 0.35) !important;
+}
+
+.theme-carnival-green .slot-viewport-frame {
+  background: #020f06 !important;
+  border: 3px solid #b78727 !important;
+  border-radius: 16px !important;
+  box-shadow: 
+    inset 0 14px 28px rgba(0, 0, 0, 0.98),
+    inset 0 -14px 28px rgba(0, 0, 0, 0.98),
+    0 6px 20px rgba(0, 0, 0, 0.8) !important;
+}
+
+.theme-carnival-green .payline-laser-bar {
+  background: rgba(212, 175, 55, 0.12) !important;
+  border-top: 2px solid #d4af37 !important;
+  border-bottom: 2px solid #d4af37 !important;
+}
+
+.theme-carnival-green .payline-laser-bar.laser-blast {
+  background: rgba(255, 215, 0, 0.28) !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.9) !important;
+}
+
+.theme-carnival-green .payline-marker {
+  color: #ffd700 !important;
+  text-shadow: 0 0 14px #ffaa00 !important;
+}
+
+/* Placa de Marquesina Carnaval */
+.carnival-plaque {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(180deg, #f9e79f 0%, #d4af37 45%, #9a7d0a 100%);
+  border: 2px solid #fcf3cf;
+  border-radius: 22px;
+  padding: 5px 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.carnival-crown {
+  font-size: 16px;
+}
+
+.carnival-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #3e2723;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Bombillas incandescentes de marquesina de carnaval */
+.carnival-marquee-bulbs {
+  display: flex;
+  justify-content: space-between;
+  width: 94%;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.bulbs-top {
+  margin-bottom: 12px;
+}
+
+.bulbs-bottom {
+  margin-top: 14px;
+}
+
+.carnival-marquee-bulbs.bulbs-left,
+.carnival-marquee-bulbs.bulbs-right {
+  position: absolute;
+  top: 100px;
+  bottom: 90px;
+  flex-direction: column;
+  width: auto;
+  justify-content: space-around;
+}
+
+.bulbs-left {
+  left: 6px;
+}
+
+.bulbs-right {
+  right: 6px;
+}
+
+.carnival-bulb {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+/* Bombilla Oro Cálido */
+.carnival-bulb.bulb-0 {
+  background: #ffd54f;
+  box-shadow: 0 0 10px #ffb300, 0 0 18px #ff8f00;
+}
+
+/* Bombilla Rubí Carnaval */
+.carnival-bulb.bulb-1 {
+  background: #ff5252;
+  box-shadow: 0 0 10px #e53935, 0 0 18px #b71c1c;
+}
+
+/* Bombilla Esmeralda */
+.carnival-bulb.bulb-2 {
+  background: #69f0ae;
+  box-shadow: 0 0 10px #00e676, 0 0 18px #00c853;
+}
+
+/* Persecución de bombillas cuando gira */
+.carnival-bulb.bulb-chase {
+  animation: carnivalBulbChase 0.4s infinite alternate;
+}
+
+@keyframes carnivalBulbChase {
+  0% { transform: scale(0.7); opacity: 0.35; }
+  100% { transform: scale(1.3); opacity: 1; filter: brightness(1.4); }
+}
+
+/* TEMA 2: ORO CLÁSICO CASINO */
+.theme-gold-classic .slot-machine-card {
+  background: radial-gradient(circle at center, #242424 0%, #111111 75%, #050505 100%) !important;
+  border: 4px solid #f1c40f !important;
+  box-shadow: 0 0 35px rgba(241, 196, 15, 0.4), 0 25px 70px rgba(0, 0, 0, 0.95) !important;
+}
+
+.theme-gold-classic .slot-viewport-frame {
+  background: #000000 !important;
+  border: 3px solid #d4af37 !important;
+}
+
+.theme-gold-classic .carnival-plaque {
+  background: linear-gradient(180deg, #ffffff 0%, #e0e0e0 40%, #a6a6a6 100%) !important;
+  border-color: #ffd700 !important;
+}
+
+/* TEMA 3: CYBER NEÓN */
+.theme-cyber-neon .slot-machine-card {
+  background: radial-gradient(circle at center, #1b1235 0%, #0d081f 75%, #05030a 100%) !important;
+  border: 4px solid #9146ff !important;
+  box-shadow: 0 0 40px rgba(145, 70, 255, 0.5), 0 25px 70px rgba(0, 0, 0, 0.95) !important;
+}
+
+.theme-cyber-neon .slot-viewport-frame {
+  background: #090a14 !important;
+  border: 3px solid #00f0ff !important;
+}
+
+.theme-cyber-neon .carnival-bulb.bulb-0 {
+  background: #00f0ff;
+  box-shadow: 0 0 10px #00f0ff;
+}
+
+.theme-cyber-neon .carnival-bulb.bulb-1 {
+  background: #ff007f;
+  box-shadow: 0 0 10px #ff007f;
+}
+
+.theme-cyber-neon .carnival-bulb.bulb-2 {
+  background: #9146ff;
+  box-shadow: 0 0 10px #9146ff;
+}
+
+/* Cinta de ganador festiva */
+.winner-celebration-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.winner-banner-ribbon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(135deg, #c0392b 0%, #962d22 50%, #78281f 100%);
+  border: 2px solid #f1c40f;
+  border-radius: 14px;
+  padding: 8px 24px;
+  box-shadow: 0 0 25px rgba(241, 196, 15, 0.7), 0 8px 20px rgba(0, 0, 0, 0.8);
+  animation: ribbonPop 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes ribbonPop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.ribbon-stars {
+  font-size: 14px;
+}
+
+.winner-banner-ribbon .winner-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ffd700;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+  margin-top: 2px;
+}
+
+.winner-banner-ribbon .winner-amount {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #ffffff;
+  text-shadow: 0 0 15px #00ff88, 0 0 25px #00ff88;
+}
+
+/* Barra de espera en reposo */
+.idle-ready-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  border-radius: 16px;
+  padding: 4px 16px;
+}
+
+.idle-indicator {
+  color: #00ff88;
+  font-size: 12px;
+  animation: idlePulse 1.2s infinite alternate;
+}
+
+@keyframes idlePulse {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.idle-text {
+  font-size: 12px;
+  font-weight: 800;
+  color: #e5c05b;
+  letter-spacing: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   NUEVO LAYOUT DE CUADRÍCULA DEL DASHBOARD
+   -------------------------------------------------------------------------- */
+.dashboard-grid-main {
+  display: grid !important;
+  grid-template-columns: 460px 1fr !important;
+  gap: 24px !important;
+  max-width: 1460px !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  padding: 0 24px 40px 24px !important;
+}
+
+@media (max-width: 1120px) {
+  .dashboard-grid-main {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Columna de configuración */
+.col-config .card-twitch-config {
+  background: rgba(18, 20, 32, 0.9);
+  border: 1px solid rgba(145, 70, 255, 0.35);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.field-label-row label code {
+  color: #00f0ff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.field-desc-tag {
+  font-size: 11px;
+  color: #8c8ea0;
+}
+
+/* Columna de Preview y OBS */
+.col-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Barra de OBS */
+.card-obs-bar {
+  background: linear-gradient(135deg, rgba(30, 24, 60, 0.85), rgba(16, 18, 30, 0.95));
+  border: 1px solid rgba(145, 70, 255, 0.4);
+  border-radius: 20px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.obs-bar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.obs-bar-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #9c9eb2;
+}
+
+.obs-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-open-new-window {
+  background: linear-gradient(135deg, #00f0ff, #0099cc);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  color: #040814;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-open-new-window:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+}
+
+/* Botón en el header */
+.btn-open-overlay {
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  color: #00f0ff;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-open-overlay:hover {
+  background: rgba(0, 240, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+/* Selector de Tema */
+.card-theme-picker {
+  background: rgba(18, 20, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.theme-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.theme-picker-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.theme-active-tag {
+  font-size: 12px;
+  color: #d4af37;
+}
+
+.theme-options-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .theme-options-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.theme-card-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  position: relative;
+}
+
+.theme-card-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.theme-card-btn.active {
+  border-color: #ffd700;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
+}
+
+.theme-btn-carnival.active {
+  background: linear-gradient(135deg, rgba(13, 74, 39, 0.4), rgba(4, 23, 12, 0.7));
+  border-color: #2ecc71;
+  box-shadow: 0 0 16px rgba(46, 204, 113, 0.35);
+}
+
+.theme-btn-gold.active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(20, 20, 20, 0.7));
+  border-color: #f1c40f;
+  box-shadow: 0 0 16px rgba(241, 196, 15, 0.35);
+}
+
+.theme-btn-neon.active {
+  background: linear-gradient(135deg, rgba(145, 70, 255, 0.3), rgba(15, 10, 30, 0.7));
+  border-color: #9146ff;
+  box-shadow: 0 0 16px rgba(145, 70, 255, 0.35);
+}
+
+.theme-icon {
+  font-size: 26px;
+}
+
+.theme-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.theme-card-info strong {
+  font-size: 13px;
+  color: #fff;
+}
+
+.theme-card-info span {
+  font-size: 11px;
+  color: #8c8ea0;
+  line-height: 1.3;
+}
+
+.theme-checkmark {
+  color: #00ff88;
+  font-weight: 900;
+  font-size: 16px;
+}
+
+/* Tarjeta del Escenario de la Máquina */
+.card-live-machine {
+  background: radial-gradient(circle at center, #1b1d30 0%, #0c0e18 100%);
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  border-radius: 22px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: rgba(12, 14, 24, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stage-quick-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.stage-canvas-wrapper {
+  min-height: 520px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 24px;
+  background: radial-gradient(circle at center, rgba(145, 70, 255, 0.05) 0%, transparent 70%);
+}
+
+.stage-canvas-wrapper .slot-machine-overlay-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 480px !important;
+  animation: none !important;
+}
+
+/* Barra de prueba rápida */
+.quick-test-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(12, 14, 24, 0.9);
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+.test-bar-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #8c8ea0;
+  text-transform: uppercase;
+}
+
+.btn-prize-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 5px 14px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-prize-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #ffd700;
+  transform: translateY(-1px);
+}
+
+.btn-prize-pill.jackpot-pill {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 140, 0, 0.2));
+  border-color: rgba(255, 215, 0, 0.5);
+  color: #ffd700;
+  font-weight: 800;
+}
+
+.btn-prize-pill.jackpot-pill:hover {
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.4);
+}
+
+/* Botón Encontrar mi Token */
+.token-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.btn-find-my-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #9146ff;
+  color: #fff;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 0 12px rgba(145, 70, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-find-my-token:hover {
+  background: #772ce8;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(145, 70, 255, 0.6);
+}
+
+.token-help-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #8c8ea0;
+  margin-top: 4px;
+}
+
+.link-tmi-alt {
+  color: #00f0ff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.link-tmi-alt:hover {
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   TARJETA DE CONTROL Y MODIFICACIÓN DE COOLDOWN
+   -------------------------------------------------------------------------- */
+.card-cooldown-control {
+  background: rgba(18, 20, 32, 0.9) !important;
+  border: 1px solid rgba(255, 215, 0, 0.3) !important;
+  border-radius: 20px !important;
+  padding: 20px 24px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.cooldown-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.cooldown-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.cooldown-icon {
+  font-size: 26px;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 12px;
+  padding: 6px;
+}
+
+.cooldown-title {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.cooldown-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #8c8ea0;
+}
+
+.cooldown-active-pill {
+  background: rgba(255, 215, 0, 0.12);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  color: #ffd700;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cooldown-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.preset-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #d1d2dc;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.preset-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #ffd700;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.preset-btn.active {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 140, 0, 0.25));
+  border-color: #ffd700;
+  color: #ffd700;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+}
+
+.cooldown-custom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.cd-stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.custom-cd-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a0a2b4;
+}
+
+.cd-stepper {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.btn-step {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #d1d2dc;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-step:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.input-cd-custom {
+  width: 60px;
+  background: transparent;
+  border: none;
+  color: #ffd700;
+  font-weight: 800;
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+}
+
+.cd-unit {
+  font-size: 11px;
+  color: #8c8ea0;
+  padding-right: 8px;
+}
+
+.btn-apply-cd {
+  background: linear-gradient(135deg, #ffd700, #ff9900);
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  color: #0c0e18;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-apply-cd:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.5);
+}
+
+.cooldown-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-test-countdown {
+  background: linear-gradient(135deg, rgba(145, 70, 255, 0.25), rgba(145, 70, 255, 0.45));
+  border: 1px solid #9146ff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-test-countdown:hover {
+  background: #9146ff;
+  box-shadow: 0 0 14px rgba(145, 70, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.btn-reset-now {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: #c7c8d6;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-reset-now:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #00ff88;
+  color: #00ff88;
+}
+
+/* Espacio final para scroll cómodo */
+.dashboard-container {
+  padding-bottom: 80px !important;
+}
+
+/* ==========================================================================
+   SISTEMA DE 8 TEMAS ÚNICOS PARA LA RULETA "RUDZY FEST"
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   ESTRUCTURA GENERAL DEL GABINETE
+   -------------------------------------------------------------------------- */
+.slot-master-root {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.slot-master-root.preview-canvas {
+  padding: 10px 0;
+}
+
+.slot-master-root.overlay-clean-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: transparent !important;
+  pointer-events: none;
+  z-index: 999999;
+}
+
+.slot-cabinet-housing {
+  position: relative;
+  width: 450px;
+  max-width: 95vw;
+  box-sizing: border-box;
+  padding: 34px 26px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+}
+
+/* Luces perimetrales de marquesina */
+.carnival-marquee-bulbs {
+  position: absolute;
+  display: flex;
+  justify-content: space-around;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.bulbs-top {
+  top: 8px;
+  left: 30px;
+  right: 30px;
+}
+
+.bulbs-bottom {
+  bottom: 8px;
+  left: 30px;
+  right: 30px;
+}
+
+.bulbs-left {
+  left: 8px;
+  top: 40px;
+  bottom: 40px;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.bulbs-right {
+  right: 8px;
+  top: 40px;
+  bottom: 40px;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.carnival-bulb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+/* Placa de Marquesina "Rudzy Fest" */
+.carnival-plaque {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 24px;
+  border-radius: 30px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+.carnival-crown {
+  font-size: 20px;
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.8));
+  animation: crownBob 2s ease-in-out infinite alternate;
+}
+
+@keyframes crownBob {
+  0% { transform: translateY(0) scale(0.95); }
+  100% { transform: translateY(-3px) scale(1.1); }
+}
+
+.carnival-title {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   TEMA 1: CARNAVAL VERDE (🎪 Carnaval Vintage / Emerald Fest)
+   ========================================================================== */
+.theme-carnival-green .slot-cabinet-housing {
+  background: radial-gradient(circle at 50% 20%, #0e5c35 0%, #062b18 80%);
+  border: 5px solid #ffd700;
+  border-radius: 36px 36px 24px 24px;
+  box-shadow: 
+    0 0 0 4px #062b18,
+    0 0 35px rgba(255, 215, 0, 0.35),
+    0 20px 60px rgba(0, 0, 0, 0.95),
+    inset 0 0 30px rgba(255, 215, 0, 0.15);
+}
+
+.theme-carnival-green .carnival-plaque {
+  background: linear-gradient(180deg, #1b683e, #0c3820);
+  border: 2px solid #ffd700;
+}
+
+.theme-carnival-green .carnival-title {
+  color: #ffd700;
+  text-shadow: 0 0 12px #ffd700, 2px 2px 0px #000;
+}
+
+.theme-carnival-green .carnival-bulb.bulb-0 {
+  background: #ffd700;
+  box-shadow: 0 0 10px #ffd700;
+}
+
+.theme-carnival-green .carnival-bulb.bulb-1 {
+  background: #ff3344;
+  box-shadow: 0 0 10px #ff3344;
+}
+
+.theme-carnival-green .carnival-bulb.bulb-2 {
+  background: #ffffff;
+  box-shadow: 0 0 10px #ffffff;
+}
+
+.theme-carnival-green .slot-viewport-frame {
+  border-color: #ffd700;
+  background: #041a0e;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95), 0 0 15px rgba(255, 215, 0, 0.2);
+}
+
+.theme-carnival-green .payline-marker {
+  color: #ffd700;
+  text-shadow: 0 0 12px #ffd700;
+}
+
+/* ==========================================================================
+   TEMA 2: ORO REAL CASINO (👑 Royal Luxury VIP)
+   ========================================================================== */
+.theme-gold-classic .slot-cabinet-housing {
+  background: radial-gradient(circle at 50% 15%, #221d14 0%, #0d0b07 85%);
+  border: 4px solid #f59e0b;
+  border-radius: 16px;
+  box-shadow: 
+    0 0 0 2px #000,
+    0 0 35px rgba(245, 158, 11, 0.5),
+    0 25px 65px rgba(0, 0, 0, 0.98),
+    inset 0 0 35px rgba(255, 215, 0, 0.25);
+}
+
+.theme-gold-classic .carnival-plaque {
+  background: linear-gradient(180deg, #332712 0%, #151007 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
+}
+
+.theme-gold-classic .carnival-title {
+  background: linear-gradient(90deg, #ffe066, #ffffff, #ffd700);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+}
+
+.theme-gold-classic .carnival-bulb {
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+
+.theme-gold-classic .carnival-bulb.bulb-0 {
+  background: #ffffff;
+  box-shadow: 0 0 12px #ffffff, 0 0 20px #ffd700;
+}
+
+.theme-gold-classic .carnival-bulb.bulb-1 {
+  background: #fbbf24;
+  box-shadow: 0 0 10px #fbbf24;
+}
+
+.theme-gold-classic .carnival-bulb.bulb-2 {
+  background: #fef08a;
+  box-shadow: 0 0 10px #fef08a;
+}
+
+.theme-gold-classic .slot-viewport-frame {
+  border-color: #fbbf24;
+  background: #090806;
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.98), 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.theme-gold-classic .payline-laser-bar {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+/* ==========================================================================
+   TEMA 3: CYBER SYNTHWAVE (⚡ Cyberpunk Neon)
+   ========================================================================== */
+.theme-cyber-neon .slot-cabinet-housing {
+  background: linear-gradient(135deg, #090314, #120524);
+  border: 3px solid #00f0ff;
+  border-radius: 6px;
+  box-shadow: 
+    0 0 25px rgba(0, 240, 255, 0.6),
+    0 0 55px rgba(255, 0, 127, 0.4),
+    inset 0 0 25px rgba(0, 240, 255, 0.2);
+}
+
+.theme-cyber-neon .carnival-plaque {
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid #00f0ff;
+  border-radius: 4px;
+}
+
+.theme-cyber-neon .carnival-title {
+  color: #00f0ff;
+  text-shadow: 0 0 10px #00f0ff, 0 0 20px #ff007f;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 3px;
+}
+
+.theme-cyber-neon .carnival-bulb {
+  width: 6px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.theme-cyber-neon .carnival-bulb.bulb-0 {
+  background: #00f0ff;
+  box-shadow: 0 0 12px #00f0ff;
+}
+
+.theme-cyber-neon .carnival-bulb.bulb-1 {
+  background: #ff007f;
+  box-shadow: 0 0 12px #ff007f;
+}
+
+.theme-cyber-neon .carnival-bulb.bulb-2 {
+  background: #9d4edd;
+  box-shadow: 0 0 12px #9d4edd;
+}
+
+.theme-cyber-neon .slot-viewport-frame {
+  border-color: #00f0ff;
+  background: #05010a;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+.theme-cyber-neon .payline-marker {
+  color: #00f0ff;
+  text-shadow: 0 0 14px #00f0ff;
+}
+
+.theme-cyber-neon .payline-laser-bar {
+  border-color: #ff007f;
+  background: rgba(255, 0, 127, 0.15);
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
+}
+
+/* ==========================================================================
+   TEMA 4: INFIERNO ARCADE (🔥 Hellfire Forge)
+   ========================================================================== */
+.theme-inferno-flame .slot-cabinet-housing {
+  background: radial-gradient(circle at 50% 30%, #380a06 0%, #120302 90%);
+  border: 4px solid #ff4500;
+  border-radius: 16px;
+  box-shadow: 
+    0 0 35px rgba(255, 69, 0, 0.65),
+    0 20px 60px rgba(0, 0, 0, 0.95),
+    inset 0 0 30px rgba(255, 120, 0, 0.3);
+}
+
+.theme-inferno-flame .carnival-plaque {
+  background: linear-gradient(180deg, #4d1008, #1c0402);
+  border: 2px solid #ff6600;
+  border-radius: 8px;
+}
+
+.theme-inferno-flame .carnival-title {
+  color: #ff9900;
+  text-shadow: 0 0 15px #ff3300, 0 0 30px #ffaa00;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.theme-inferno-flame .carnival-bulb.bulb-0 {
+  background: #ff3c00;
+  box-shadow: 0 0 12px #ff6600, 0 0 20px #ff0000;
+}
+
+.theme-inferno-flame .carnival-bulb.bulb-1 {
+  background: #ffaa00;
+  box-shadow: 0 0 10px #ffaa00;
+}
+
+.theme-inferno-flame .carnival-bulb.bulb-2 {
+  background: #ff0033;
+  box-shadow: 0 0 10px #ff0033;
+}
+
+.theme-inferno-flame .slot-viewport-frame {
+  border-color: #ff4500;
+  background: #0f0201;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95), 0 0 25px rgba(255, 69, 0, 0.4);
+}
+
+.theme-inferno-flame .payline-marker {
+  color: #ffaa00;
+  text-shadow: 0 0 14px #ff4500;
+}
+
+.theme-inferno-flame .payline-laser-bar {
+  border-color: #ff4500;
+  background: rgba(255, 69, 0, 0.2);
+  box-shadow: 0 0 20px rgba(255, 69, 0, 0.7);
+}
+
+/* ==========================================================================
+   TEMA 5: GLACIAR ÁRTICO (❄️ Arctic Frostbite)
+   ========================================================================== */
+.theme-ice-frost .slot-cabinet-housing {
+  background: linear-gradient(145deg, rgba(6, 26, 48, 0.95), rgba(2, 12, 24, 0.98));
+  border: 3px solid #00d2ff;
+  border-radius: 26px;
+  box-shadow: 
+    0 0 35px rgba(0, 210, 255, 0.5),
+    0 20px 60px rgba(0, 0, 0, 0.95),
+    inset 0 0 25px rgba(255, 255, 255, 0.2);
+}
+
+.theme-ice-frost .carnival-plaque {
+  background: rgba(0, 210, 255, 0.15);
+  border: 2px solid #ffffff;
+  border-radius: 20px;
+}
+
+.theme-ice-frost .carnival-title {
+  color: #ffffff;
+  text-shadow: 0 0 12px #00d2ff, 0 0 25px #ffffff;
+}
+
+.theme-ice-frost .carnival-bulb.bulb-0 {
+  background: #00e5ff;
+  box-shadow: 0 0 12px #00e5ff;
+}
+
+.theme-ice-frost .carnival-bulb.bulb-1 {
+  background: #ffffff;
+  box-shadow: 0 0 12px #ffffff;
+}
+
+.theme-ice-frost .carnival-bulb.bulb-2 {
+  background: #70e1ff;
+  box-shadow: 0 0 10px #70e1ff;
+}
+
+.theme-ice-frost .slot-viewport-frame {
+  border-color: #00d2ff;
+  background: #020b14;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 210, 255, 0.35);
+}
+
+.theme-ice-frost .payline-marker {
+  color: #00e5ff;
+  text-shadow: 0 0 14px #00e5ff;
+}
+
+.theme-ice-frost .payline-laser-bar {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.15);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.6);
+}
+
+/* ==========================================================================
+   TEMA 6: RETRO MIAMI 80s (🌴 Vaporwave Sunset)
+   ========================================================================== */
+.theme-vaporwave-sunset .slot-cabinet-housing {
+  background: linear-gradient(180deg, #240942 0%, #4a105c 40%, #871658 75%, #d64a0b 100%);
+  border: 4px solid #ff2a85;
+  border-radius: 32px;
+  box-shadow: 
+    0 0 35px rgba(255, 42, 133, 0.55),
+    0 0 60px rgba(0, 240, 255, 0.35),
+    0 20px 60px rgba(0, 0, 0, 0.95),
+    inset 0 0 30px rgba(255, 119, 0, 0.3);
+}
+
+.theme-vaporwave-sunset .carnival-plaque {
+  background: rgba(18, 4, 34, 0.85);
+  border: 2px solid #ff2a85;
+}
+
+.theme-vaporwave-sunset .carnival-title {
+  color: #ff99ff;
+  text-shadow: 0 0 12px #ff2a85, 0 0 24px #00f0ff;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 3px;
+}
+
+.theme-vaporwave-sunset .carnival-bulb.bulb-0 {
+  background: #ff2a85;
+  box-shadow: 0 0 12px #ff2a85;
+}
+
+.theme-vaporwave-sunset .carnival-bulb.bulb-1 {
+  background: #00f0ff;
+  box-shadow: 0 0 12px #00f0ff;
+}
+
+.theme-vaporwave-sunset .carnival-bulb.bulb-2 {
+  background: #ffd700;
+  box-shadow: 0 0 12px #ffd700;
+}
+
+.theme-vaporwave-sunset .slot-viewport-frame {
+  border-color: #ff2a85;
+  background: #110321;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95), 0 0 20px rgba(255, 42, 133, 0.4);
+}
+
+.theme-vaporwave-sunset .payline-marker {
+  color: #00f0ff;
+  text-shadow: 0 0 14px #00f0ff;
+}
+
+.theme-vaporwave-sunset .payline-laser-bar {
+  border-color: #ff2a85;
+  background: rgba(255, 42, 133, 0.15);
+  box-shadow: 0 0 20px rgba(255, 42, 133, 0.6);
+}
+
+/* ==========================================================================
+   TEMA 7: STEAMPUNK BRASS (⚙️ Victorian Clockwork)
+   ========================================================================== */
+.theme-steampunk-brass .slot-cabinet-housing {
+  background: radial-gradient(circle at 50% 30%, #3b1f11 0%, #160c06 90%);
+  border: 5px solid #b87333;
+  border-radius: 18px;
+  box-shadow: 
+    0 0 25px rgba(184, 115, 51, 0.5),
+    0 20px 60px rgba(0, 0, 0, 0.98),
+    inset 0 0 35px rgba(0, 0, 0, 0.85);
+}
+
+.theme-steampunk-brass .carnival-plaque {
+  background: linear-gradient(180deg, #442415, #1d0f08);
+  border: 2px solid #d49356;
+  border-radius: 6px;
+}
+
+.theme-steampunk-brass .carnival-title {
+  color: #f5c28b;
+  text-shadow: 1px 1px 0px #000, 0 0 12px rgba(212, 147, 86, 0.8);
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  letter-spacing: 2px;
+}
+
+.theme-steampunk-brass .carnival-bulb.bulb-0 {
+  background: #ff8c00;
+  box-shadow: 0 0 12px #ff8c00, 0 0 20px #e65100;
+}
+
+.theme-steampunk-brass .carnival-bulb.bulb-1 {
+  background: #d49356;
+  box-shadow: 0 0 10px #d49356;
+}
+
+.theme-steampunk-brass .carnival-bulb.bulb-2 {
+  background: #ffe0b2;
+  box-shadow: 0 0 10px #ffe0b2;
+}
+
+.theme-steampunk-brass .slot-viewport-frame {
+  border-color: #b87333;
+  background: #110703;
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.98), 0 0 15px rgba(184, 115, 51, 0.3);
+}
+
+.theme-steampunk-brass .payline-marker {
+  color: #f5c28b;
+  text-shadow: 0 0 12px #d49356;
+}
+
+.theme-steampunk-brass .payline-laser-bar {
+  border-color: #d49356;
+  background: rgba(212, 147, 86, 0.15);
+  box-shadow: 0 0 15px rgba(212, 147, 86, 0.5);
+}
+
+/* ==========================================================================
+   TEMA 8: COSMOS GALÁCTICO (🌌 Deep Space Void)
+   ========================================================================== */
+.theme-galactic-void .slot-cabinet-housing {
+  background: radial-gradient(circle at 40% 30%, #2f0858 0%, #0e021c 85%);
+  border: 3px solid #a855f7;
+  border-radius: 28px;
+  box-shadow: 
+    0 0 40px rgba(168, 85, 247, 0.55),
+    0 0 70px rgba(236, 72, 153, 0.35),
+    0 20px 60px rgba(0, 0, 0, 0.95),
+    inset 0 0 35px rgba(168, 85, 247, 0.25);
+}
+
+.theme-galactic-void .carnival-plaque {
+  background: rgba(46, 8, 88, 0.6);
+  border: 2px solid #c084fc;
+}
+
+.theme-galactic-void .carnival-title {
+  color: #f0abfc;
+  text-shadow: 0 0 14px #c084fc, 0 0 28px #ec4899;
+  letter-spacing: 2px;
+}
+
+.theme-galactic-void .carnival-bulb.bulb-0 {
+  background: #a855f7;
+  box-shadow: 0 0 12px #a855f7;
+}
+
+.theme-galactic-void .carnival-bulb.bulb-1 {
+  background: #ec4899;
+  box-shadow: 0 0 12px #ec4899;
+}
+
+.theme-galactic-void .carnival-bulb.bulb-2 {
+  background: #38bdf8;
+  box-shadow: 0 0 12px #38bdf8;
+}
+
+.theme-galactic-void .slot-viewport-frame {
+  border-color: #a855f7;
+  background: #080112;
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.98), 0 0 25px rgba(168, 85, 247, 0.35);
+}
+
+.theme-galactic-void .payline-marker {
+  color: #f0abfc;
+  text-shadow: 0 0 14px #ec4899;
+}
+
+.theme-galactic-void .payline-laser-bar {
+  border-color: #c084fc;
+  background: rgba(192, 132, 252, 0.15);
+  box-shadow: 0 0 20px rgba(192, 132, 252, 0.6);
+}
+
+/* --------------------------------------------------------------------------
+   SELECTOR DE TEMAS EN EL DASHBOARD (GRID 8 TEMAS)
+   -------------------------------------------------------------------------- */
+.grid-8-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.theme-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-picker-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #8c8ea0;
+}
+
+.theme-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.theme-tag-pill {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #a8aab8;
+}
+
+.theme-color-preview-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  margin-top: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   ESTILOS DE LA TARJETA DE JUGADOR EN CADA UNO DE LOS 8 TEMAS
+   -------------------------------------------------------------------------- */
+/* 1. CARNAVAL VERDE */
+.theme-carnival-green .spin-by-card {
+  background: rgba(4, 26, 14, 0.88);
+  border: 1.5px solid rgba(255, 215, 0, 0.45);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.theme-carnival-green .spin-by-label {
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
+}
+.theme-carnival-green .spin-by-username {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px #ffd700;
+}
+
+/* 2. ORO REAL CASINO */
+.theme-gold-classic .spin-by-card {
+  background: rgba(18, 15, 8, 0.9);
+  border: 1.5px solid rgba(251, 191, 36, 0.5);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7), 0 4px 14px rgba(245, 158, 11, 0.2);
+}
+.theme-gold-classic .spin-by-label {
+  color: #fbbf24;
+  letter-spacing: 2.5px;
+}
+.theme-gold-classic .spin-by-username {
+  background: linear-gradient(90deg, #ffffff, #ffd700, #ffffff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.7));
+}
+
+/* 3. CYBER SYNTHWAVE */
+.theme-cyber-neon .spin-by-card {
+  background: rgba(7, 2, 18, 0.9);
+  border: 1.5px solid #00f0ff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3), inset 0 0 8px rgba(0, 240, 255, 0.15);
+  border-radius: 4px;
+}
+.theme-cyber-neon .spin-by-label {
+  color: #ff007f;
+  text-shadow: 0 0 8px #ff007f;
+  font-family: monospace;
+  letter-spacing: 2px;
+}
+.theme-cyber-neon .spin-by-username {
+  color: #00f0ff;
+  text-shadow: 0 0 12px #00f0ff, 0 0 24px #00f0ff;
+}
+
+/* 4. INFIERNO ARCADE */
+.theme-inferno-flame .spin-by-card {
+  background: rgba(26, 4, 2, 0.9);
+  border: 1.5px solid #ff4500;
+  box-shadow: 0 0 12px rgba(255, 69, 0, 0.35), inset 0 0 8px rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+}
+.theme-inferno-flame .spin-by-label {
+  color: #ffaa00;
+  text-shadow: 0 0 8px #ff4500;
+}
+.theme-inferno-flame .spin-by-username {
+  color: #ffffff;
+  text-shadow: 0 0 12px #ff4500, 0 0 22px #ff2200;
+}
+
+/* 5. GLACIAR ÁRTICO */
+.theme-ice-frost .spin-by-card {
+  background: rgba(3, 16, 32, 0.85);
+  border: 1.5px solid #00d2ff;
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.35), inset 0 0 10px rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+.theme-ice-frost .spin-by-label {
+  color: #70e1ff;
+  text-shadow: 0 0 8px #00d2ff;
+}
+.theme-ice-frost .spin-by-username {
+  color: #ffffff;
+  text-shadow: 0 0 12px #00d2ff, 0 0 22px #ffffff;
+}
+
+/* 6. RETRO MIAMI 80s */
+.theme-vaporwave-sunset .spin-by-card {
+  background: rgba(22, 5, 40, 0.85);
+  border: 1.5px solid #ff2a85;
+  box-shadow: 0 0 14px rgba(255, 42, 133, 0.4), inset 0 0 10px rgba(0, 0, 0, 0.5);
+  border-radius: 18px;
+}
+.theme-vaporwave-sunset .spin-by-label {
+  color: #00f0ff;
+  text-shadow: 0 0 8px #00f0ff;
+}
+.theme-vaporwave-sunset .spin-by-username {
+  color: #ffffff;
+  text-shadow: 0 0 12px #ff2a85, 0 0 20px #00f0ff;
+}
+
+/* 7. STEAMPUNK BRASS */
+.theme-steampunk-brass .spin-by-card {
+  background: rgba(28, 14, 7, 0.9);
+  border: 1.5px solid #b87333;
+  box-shadow: inset 0 0 10px #000, 0 4px 12px rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+}
+.theme-steampunk-brass .spin-by-label {
+  color: #d49356;
+  letter-spacing: 2px;
+}
+.theme-steampunk-brass .spin-by-username {
+  color: #ffe0b2;
+  text-shadow: 0 0 10px rgba(212, 147, 86, 0.8);
+}
+
+/* 8. COSMOS GALÁCTICO */
+.theme-galactic-void .spin-by-card {
+  background: rgba(14, 2, 28, 0.9);
+  border: 1.5px solid #c084fc;
+  box-shadow: 0 0 14px rgba(192, 132, 252, 0.4), inset 0 0 10px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+}
+.theme-galactic-void .spin-by-label {
+  color: #ec4899;
+  text-shadow: 0 0 8px #ec4899;
+}
+.theme-galactic-void .spin-by-username {
+  color: #f0abfc;
+  text-shadow: 0 0 12px #c084fc, 0 0 24px #ec4899;
+}
+
+

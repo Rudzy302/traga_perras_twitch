@@ -1,0 +1,61 @@
+import { OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { TwitchService } from '../twitch/twitch.service';
+export interface StartSpinPayload {
+    username: string;
+    prize: number;
+    duration: number;
+    prizesList: number[];
+}
+export interface SetCredentialsPayload {
+    channel: string;
+    botUsername?: string;
+    oauthToken?: string;
+    pointsCommand?: string;
+    cooldownSeconds?: number;
+}
+export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+    private readonly twitchService;
+    server: Server;
+    private readonly logger;
+    constructor(twitchService: TwitchService);
+    afterInit(server: Server): void;
+    handleConnection(client: Socket): void;
+    handleDisconnect(client: Socket): void;
+    emitStartSpin(payload: StartSpinPayload): void;
+    handleGetStatus(client: Socket): {
+        channel: string;
+        botUsername: string;
+        oauthToken: string;
+        isAuthenticated: boolean;
+        isSpinActive: boolean;
+        cooldownSeconds: number;
+        pointsCommand: string;
+        isConfigured: boolean;
+    };
+    handleSetCredentials(client: Socket, payload: SetCredentialsPayload): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    handleTestSpin(client: Socket, payload?: {
+        username?: string;
+        prize?: number;
+    }): {
+        success: boolean;
+    };
+    handleResetCooldown(client: Socket): {
+        success: boolean;
+        message: string;
+    };
+    emitTwitchStatus(status: any): void;
+    handleTestCountdown(client: Socket): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    handleSetCooldown(client: Socket, payload: {
+        cooldownSeconds: number;
+    }): {
+        success: boolean;
+        message: string;
+    };
+}
