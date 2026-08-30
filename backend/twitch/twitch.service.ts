@@ -303,8 +303,6 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       this.client = new tmi.Client(clientOptions);
 
       this.client.on('message', (channel, tags, message, self) => {
-        // Ignorar mensajes enviados por el bot para evitar bucles
-        if (self) return;
         this.handleChatMessage(channel, tags, message);
       });
 
@@ -328,7 +326,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Procesa mensajes de chat para detectar !spin y !ruleta
+   * Procesa mensajes de chat para detectar canjes de BotRix y comandos !spin / !ruleta
    */
   private async handleChatMessage(
     channel: string,
@@ -338,14 +336,27 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     const trimmedMsg = message.trim();
     const sender = tags['display-name'] || tags.username || 'Viewer';
 
-    // Detección si BotRix rechaza por cooldown ("the item is on cooldown")
-    if (trimmedMsg.toLowerCase().includes('the item is on cooldown') || trimmedMsg.toLowerCase().includes('is on cooldown')) {
+    // 1. Ignorar comandos de entrega de puntos o avisos emitidos por el propio bot para evitar bucles
+    if (
+      trimmedMsg.startsWith('!points add') ||
+      trimmedMsg.startsWith('!p @') ||
+      trimmedMsg.startsWith('⏳') ||
+      trimmedMsg.startsWith('🚨')
+    ) {
+      return;
+    }
+
+    // 2. Detección si BotRix rechaza por cooldown ("the item is on cooldown")
+    if (
+      trimmedMsg.toLowerCase().includes('the item is on cooldown') ||
+      trimmedMsg.toLowerCase().includes('is on cooldown')
+    ) {
       this.logger.warn(`⛔ [Cooldown Detectado] BotRix rechazó la tirada: ${trimmedMsg}.`);
       this.isSpinActive = false;
       return;
     }
 
-    // Comando manual para que el streamer resetee el cooldown cuando quiera hacer pruebas
+    // 3. Comando manual para que el streamer resetee el cooldown cuando quiera hacer pruebas
     if (
       trimmedMsg.toLowerCase() === '!resetcooldown' ||
       trimmedMsg.toLowerCase() === '!ruletareset'
@@ -355,43 +366,60 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     }
 
     // =========================================================================
-    // CASO 1: DETECCIÓN DEL MENSAJE DE BOTRIX CON PREMIO YA CALCULADO
+    // CASO 1: DETECCIÓN DE CANJES DE BOTRIX / PUNTOS DE CANAL
+    // Ejemplo: "Gracias por canjear RULETA @Rudzy_tv" o "@usuario 50 pts. GANADOS EN LA RULETAAAA"
     // =========================================================================
-    const botrixRegex = /@?(\w+)\s+(\d+)\s+pts\.\s+GANADOS\s+EN\s+LA\s+RULETAAAA/i;
-    const botrixMatch = trimmedMsg.match(botrixRegex);
+    const canjeRegex1 = /(?:canjear|canjeado|canjeo|canjeó)\s+(?:la\s+)?ruleta.*?@?([a-zA-Z0-9_]+)/i;
+    const canjeRegex2 = /@?([a-zA-Z0-9_]+).*?(?:canjear|canjeado|canjeo|canjeó)\s+(?:la\s+)?ruleta/i;
+    const botrixPrizeRegex = /@?([a-zA-Z0-9_]+)\s+(\d+)\s+pts\.\s+GANADOS\s+EN\s+LA\s+RULETAAAA/i;
 
-    if (botrixMatch) {
-      const targetUser = botrixMatch[1];
-      const botrixPrize = parseInt(botrixMatch[2], 10);
+    let targetUser: string | null = null;
+    let explicitPrize: number | null = null;
 
-      this.logger.log(
-        `🎯 [BotRix Detectado] @${targetUser} ganó ${botrixPrize} pts. Ejecutando ruleta...`,
-      );
-      await this.executeSpinFlow(channel, targetUser, botrixPrize);
+    const botrixPrizeMatch = trimmedMsg.match(botrixPrizeRegex);
+    if (botrixPrizeMatch) {
+      targetUser = botrixPrizeMatch[1];
+      explicitPrize = parseInt(botrixPrizeMatch[2], 10);
+    } else {
+      const canjeMatch1 = trimmedMsg.match(canjeRegex1);
+      const canjeMatch2 = trimmedMsg.match(canjeRegex2);
+      if (canjeMatch1) {
+        targetUser = canjeMatch1[1];
+      } else if (canjeMatch2) {
+        targetUser = canjeMatch2[1];
+      }
+    }
+
+    if (targetUser) {
+      const cleanUser = targetUser.replace(/^@/, '');
+      const lastUserSpin = this.recentSpinUsers.get(cleanUser.toLowerCase()) || 0;
+      if (Date.now() - lastUserSpin < 4000) {
+        return;
+      }
+
+      this.logger.log(`🎯 [Canje de BotRix Detectado para @${cleanUser}]: "${trimmedMsg}"`);
+      const prize = explicitPrize !== null ? explicitPrize : this.selectWeightedJackpotPrize();
+      await this.executeSpinFlow(channel, cleanUser, prize);
       return;
     }
 
     // =========================================================================
     // CASO 2: COMANDO !spin (o !ruleta) EN EL CHAT DE TWITCH
+    // Funciona para cualquier viewer, suscriptor, mod o el propio streamer.
     // Solo ejecuta la acción visual sin retornar mensajes invasivos en el chat.
     // =========================================================================
-    const spinMatch = trimmedMsg.match(/^!(?:spin|ruleta)(?:\s+@?(\w+))?/i);
+    const spinMatch = trimmedMsg.match(/^!(?:spin|ruleta)(?:\s+@?([a-zA-Z0-9_]+))?/i);
     if (spinMatch) {
-      // Si el mensaje fue enviado por el propio bot del streamer, ignorar
-      if (this.currentBotUsername && sender.toLowerCase() === this.currentBotUsername.toLowerCase()) {
+      const cleanUser = (spinMatch[1] || sender).replace(/^@/, '');
+
+      const lastUserSpin = this.recentSpinUsers.get(cleanUser.toLowerCase()) || 0;
+      if (Date.now() - lastUserSpin < 4000) {
         return;
       }
 
-      const targetUser = (spinMatch[1] || sender).replace(/^@/, '');
-
-      const lastUserSpin = this.recentSpinUsers.get(targetUser.toLowerCase()) || 0;
-      if (Date.now() - lastUserSpin < 3000) {
-        return;
-      }
-
-      this.logger.log(`🎰 [Comando !spin Detectado] @${targetUser} activó la ruleta`);
+      this.logger.log(`🎰 [Comando !spin Detectado] @${cleanUser} activó la ruleta`);
       const weightedPrize = this.selectWeightedJackpotPrize();
-      await this.executeSpinFlow(channel, targetUser, weightedPrize);
+      await this.executeSpinFlow(channel, cleanUser, weightedPrize);
       return;
     }
   }
