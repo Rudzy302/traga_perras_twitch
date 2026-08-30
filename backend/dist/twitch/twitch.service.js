@@ -25,11 +25,13 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.logger = new common_1.Logger(TwitchService_1.name);
         this.client = null;
         this.isAuthenticated = false;
-        this.currentChannel = process.env.TWITCH_CHANNEL || '';
-        this.currentBotUsername = process.env.TWITCH_BOT_USERNAME || '';
-        this.currentOauthToken = process.env.TWITCH_OAUTH_TOKEN || '';
-        this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
-        this.SPIN_DURATION_MS = 16000;
+        this.currentChannel = '';
+        this.currentBotUsername = '';
+        this.currentOauthToken = '';
+        this.pointsCommandPattern = '!points add {user} {prize}';
+        this.currentTheme = 'carnival-green';
+        this.announceCountdownInChat = false;
+        this.SPIN_DURATION_MS = 15500;
         this.cooldownMs = 5 * 60 * 1000;
         this.PRIZE_TIERS = [
             {
@@ -66,19 +68,8 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.cooldownTimers = [];
     }
     async onModuleInit() {
-        this.currentChannel = process.env.TWITCH_CHANNEL || '';
-        this.currentBotUsername = process.env.TWITCH_BOT_USERNAME || this.currentChannel;
-        this.currentOauthToken = process.env.TWITCH_OAUTH_TOKEN || '';
-        this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
-        const envCooldown = process.env.COOLDOWN_SECONDS;
-        if (envCooldown && !isNaN(Number(envCooldown))) {
-            this.cooldownMs = Number(envCooldown) * 1000;
-            this.logger.log(`⏱️ Cooldown configurado a ${envCooldown} segundos.`);
-        }
-        else {
-            this.cooldownMs = 5 * 60 * 1000;
-            this.logger.log('⏱️ Cooldown configurado a 5 MINUTOS (300 segundos).');
-        }
+        this.loadConfigFromDisk();
+        this.logger.log(`⏱️ Cooldown configurado a ${Math.round(this.cooldownMs / 1000)} segundos.`);
         if (this.currentChannel.trim() !== '') {
             await this.connectToTwitch();
         }
@@ -88,6 +79,112 @@ let TwitchService = TwitchService_1 = class TwitchService {
     }
     async onModuleDestroy() {
         await this.disconnectFromTwitch();
+    }
+    getCandidateFilePaths(fileName) {
+        const cwd = process.cwd();
+        return [
+            path.resolve(cwd, fileName),
+            path.resolve(cwd, 'backend', fileName),
+            path.resolve(cwd, '..', fileName),
+            path.resolve(__dirname, '..', '..', fileName),
+            path.resolve(__dirname, '..', fileName),
+            path.resolve(__dirname, fileName),
+        ];
+    }
+    saveConfigToDisk(data) {
+        const jsonStr = JSON.stringify(data, null, 2);
+        const envContent = [
+            `# =========================================================================`,
+            `# CONFIGURACIÓN DEL CASINO TWITCH - PERSISTENCIA PERMANENTE`,
+            `# =========================================================================`,
+            `TWITCH_CHANNEL=${data.channel}`,
+            `TWITCH_BOT_USERNAME=${data.botUsername}`,
+            `TWITCH_OAUTH_TOKEN=${data.oauthToken}`,
+            `POINTS_COMMAND=${data.pointsCommand}`,
+            `COOLDOWN_SECONDS=${data.cooldownSeconds}`,
+            `THEME=${data.theme || 'carnival-green'}`,
+            `ANNOUNCE_COUNTDOWN=${data.announceCountdown ? 'true' : 'false'}`,
+            `PORT=${process.env.PORT || 3000}`,
+        ].join('\n');
+        for (const p of this.getCandidateFilePaths('casino_config.json')) {
+            try {
+                const dir = path.dirname(p);
+                if (fs.existsSync(dir)) {
+                    fs.writeFileSync(p, jsonStr, 'utf-8');
+                    this.logger.log(`💾 [Config JSON Guardado]: ${p}`);
+                }
+            }
+            catch { }
+        }
+        for (const p of this.getCandidateFilePaths('.env')) {
+            try {
+                const dir = path.dirname(p);
+                if (fs.existsSync(dir)) {
+                    fs.writeFileSync(p, envContent, 'utf-8');
+                    this.logger.log(`💾 [.env Guardado]: ${p}`);
+                }
+            }
+            catch { }
+        }
+    }
+    loadConfigFromDisk() {
+        for (const p of this.getCandidateFilePaths('casino_config.json')) {
+            try {
+                if (fs.existsSync(p)) {
+                    const raw = fs.readFileSync(p, 'utf-8');
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') {
+                        this.currentChannel = (parsed.channel || '').trim();
+                        this.currentBotUsername = (parsed.botUsername || this.currentChannel).trim();
+                        this.currentOauthToken = (parsed.oauthToken || '').trim();
+                        this.pointsCommandPattern = parsed.pointsCommand || '!points add {user} {prize}';
+                        this.cooldownMs = (Number(parsed.cooldownSeconds) || 300) * 1000;
+                        this.currentTheme = parsed.theme || 'carnival-green';
+                        this.announceCountdownInChat = parsed.announceCountdown === true;
+                        this.logger.log(`📂 [Config Cargada desde JSON ${p}]: Canal #${this.currentChannel} | Cooldown ${parsed.cooldownSeconds}s`);
+                        return;
+                    }
+                }
+            }
+            catch { }
+        }
+        for (const p of this.getCandidateFilePaths('.env')) {
+            try {
+                if (fs.existsSync(p)) {
+                    const raw = fs.readFileSync(p, 'utf-8');
+                    const lines = raw.split('\n');
+                    const envMap = {};
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+                            const idx = trimmed.indexOf('=');
+                            const key = trimmed.substring(0, idx).trim();
+                            const val = trimmed.substring(idx + 1).trim();
+                            envMap[key] = val;
+                        }
+                    }
+                    if (envMap.TWITCH_CHANNEL) {
+                        this.currentChannel = (envMap.TWITCH_CHANNEL || '').trim();
+                        this.currentBotUsername = (envMap.TWITCH_BOT_USERNAME || this.currentChannel).trim();
+                        this.currentOauthToken = (envMap.TWITCH_OAUTH_TOKEN || '').trim();
+                        this.pointsCommandPattern = envMap.POINTS_COMMAND || '!points add {user} {prize}';
+                        this.cooldownMs = (Number(envMap.COOLDOWN_SECONDS) || 300) * 1000;
+                        this.currentTheme = envMap.THEME || 'carnival-green';
+                        this.announceCountdownInChat = envMap.ANNOUNCE_COUNTDOWN === 'true';
+                        this.logger.log(`📂 [Config Cargada desde .env ${p}]: Canal #${this.currentChannel}`);
+                        return;
+                    }
+                }
+            }
+            catch { }
+        }
+        this.currentChannel = process.env.TWITCH_CHANNEL || '';
+        this.currentBotUsername = process.env.TWITCH_BOT_USERNAME || this.currentChannel;
+        this.currentOauthToken = process.env.TWITCH_OAUTH_TOKEN || '';
+        this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
+        this.cooldownMs = (Number(process.env.COOLDOWN_SECONDS) || 300) * 1000;
+        this.currentTheme = 'carnival-green';
+        this.announceCountdownInChat = false;
     }
     async disconnectFromTwitch() {
         if (this.client) {
@@ -105,69 +202,55 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.logger.warn('⚠️ No se puede conectar a Twitch: Canal vacío.');
             return;
         }
-        const channelName = this.currentChannel.trim().replace(/^#/, '');
-        const formattedChannel = `#${channelName.toLowerCase()}`;
+        const cleanChannel = this.currentChannel.replace(/^#/, '');
+        let formattedToken = (this.currentOauthToken || '').trim();
+        if (formattedToken && !formattedToken.startsWith('oauth:')) {
+            formattedToken = `oauth:${formattedToken}`;
+        }
         const clientOptions = {
             options: { debug: false },
-            connection: {
-                secure: true,
-                reconnect: true,
-            },
-            channels: [formattedChannel],
+            channels: [cleanChannel],
         };
-        if (this.currentOauthToken.trim() !== '') {
-            const oauthPassword = this.currentOauthToken.startsWith('oauth:')
-                ? this.currentOauthToken
-                : `oauth:${this.currentOauthToken}`;
-            const botUser = (this.currentBotUsername || channelName).trim().replace(/^@/, '');
+        if (formattedToken && formattedToken.length > 6) {
+            const botNick = this.currentBotUsername || cleanChannel;
             clientOptions.identity = {
-                username: botUser.toLowerCase(),
-                password: oauthPassword,
+                username: botNick,
+                password: formattedToken,
             };
             this.isAuthenticated = true;
-            this.logger.log(`🔐 MODO AUTENTICADO ACTIVO como @${clientOptions.identity.username} en canal ${formattedChannel}. Los premios se enviarán automáticamente.`);
+            this.logger.log(`🔐 Conectando a Twitch en MODO AUTENTICADO como @${botNick} en #${cleanChannel}...`);
         }
         else {
             this.isAuthenticated = false;
-            this.logger.warn(`👀 MODO SÓLO LECTURA activo para ${formattedChannel}. Falta TWITCH_OAUTH_TOKEN para que el bot pueda enviar puntos automáticamente.`);
+            this.logger.warn(`👁️ Conectando a Twitch en MODO SÓLO LECTURA anónimo en #${cleanChannel} (Sin Token OAuth). La ruleta visual funcionará pero no podrá enviar comandos de puntos.`);
         }
-        this.client = new tmi.Client(clientOptions);
-        this.client.on('message', (chan, tags, message, self) => {
-            this.handleChatMessage(chan, tags, message, self);
-        });
-        this.client.on('connected', (address, port) => {
-            this.logger.log(`✅ CONEXIÓN EXITOSA con Twitch Chat (${address}:${port}) en canal: ${formattedChannel}`);
-        });
         try {
+            this.client = new tmi.Client(clientOptions);
+            this.client.on('message', (channel, tags, message, self) => {
+                if (self)
+                    return;
+                this.handleChatMessage(channel, tags, message);
+            });
+            this.client.on('connected', (addr, port) => {
+                this.logger.log(`✅ [Twitch IRC Conectado] en ${addr}:${port} | Canal: #${cleanChannel}`);
+                this.casinoGateway.emitTwitchStatus(this.getStatus());
+            });
+            this.client.on('disconnected', (reason) => {
+                this.logger.warn(`🔌 [Twitch IRC Desconectado]: ${reason}`);
+                this.isAuthenticated = false;
+                this.casinoGateway.emitTwitchStatus(this.getStatus());
+            });
             await this.client.connect();
         }
         catch (error) {
-            this.logger.error(`❌ Error conectando al chat de ${formattedChannel}:`, error);
+            this.logger.error(`❌ Error al conectar con Twitch: ${error.message || error}`);
+            this.isAuthenticated = false;
+            this.casinoGateway.emitTwitchStatus(this.getStatus());
         }
     }
-    selectWeightedJackpotPrize() {
-        const totalWeight = this.PRIZE_TIERS.reduce((sum, tier) => sum + tier.weight, 0);
-        let random = Math.random() * totalWeight;
-        for (const tier of this.PRIZES_TIERS_SAFE) {
-            if (random < tier.weight) {
-                return tier.prizes[Math.floor(Math.random() * tier.prizes.length)];
-            }
-            random -= tier.weight;
-        }
-        return 10;
-    }
-    get PRIZES_TIERS_SAFE() {
-        return this.PRIZE_TIERS;
-    }
-    async handleChatMessage(channel, tags, message, self) {
+    async handleChatMessage(channel, tags, message) {
         const trimmedMsg = message.trim();
-        const sender = tags['display-name'] || tags.username || 'usuario';
-        if (trimmedMsg.startsWith('!points add') ||
-            trimmedMsg.startsWith('!p ') ||
-            trimmedMsg === '!p') {
-            return;
-        }
-        this.logger.log(`💬 [Chat ${channel}] ${sender}: ${trimmedMsg}`);
+        const sender = tags['display-name'] || tags.username || 'Viewer';
         if (trimmedMsg.toLowerCase().includes('the item is on cooldown') || trimmedMsg.toLowerCase().includes('is on cooldown')) {
             this.logger.warn(`⛔ [Cooldown Detectado] BotRix rechazó la tirada: ${trimmedMsg}.`);
             this.isSpinActive = false;
@@ -184,41 +267,33 @@ let TwitchService = TwitchService_1 = class TwitchService {
             const targetUser = botrixMatch[1];
             const botrixPrize = parseInt(botrixMatch[2], 10);
             this.logger.log(`🎯 [BotRix Detectado] @${targetUser} ganó ${botrixPrize} pts. Ejecutando ruleta...`);
-            await this.executeSpinFlow(channel, targetUser, botrixPrize, false);
+            await this.executeSpinFlow(channel, targetUser, botrixPrize);
             return;
         }
-        const spinMatch = trimmedMsg.match(/^!spin(?:\s+@?(\w+))?/i);
-        if (spinMatch && !trimmedMsg.toLowerCase().startsWith('!ruleta')) {
+        const spinMatch = trimmedMsg.match(/^!(?:spin|ruleta)(?:\s+@?(\w+))?/i);
+        if (spinMatch) {
+            if (this.currentBotUsername && sender.toLowerCase() === this.currentBotUsername.toLowerCase()) {
+                return;
+            }
             const targetUser = (spinMatch[1] || sender).replace(/^@/, '');
             const lastUserSpin = this.recentSpinUsers.get(targetUser.toLowerCase()) || 0;
             if (Date.now() - lastUserSpin < 3000) {
                 return;
             }
-            this.logger.log(`🎰 [Comando !spin Detectado] para @${targetUser}`);
+            this.logger.log(`🎰 [Comando !spin Detectado] @${targetUser} activó la ruleta`);
             const weightedPrize = this.selectWeightedJackpotPrize();
-            await this.executeSpinFlow(channel, targetUser, weightedPrize, false);
+            await this.executeSpinFlow(channel, targetUser, weightedPrize);
             return;
         }
-        const firstWord = trimmedMsg.toLowerCase().split(' ')[0];
-        if (firstWord === '!ruleta' || firstWord === '!ruletaa') {
-            const user = sender.replace(/^@/, '');
-            const lastUserSpin = this.recentSpinUsers.get(user.toLowerCase()) || 0;
-            if (Date.now() - lastUserSpin < 3000) {
-                return;
-            }
-            this.logger.log(`🎰 [Comando !ruleta Detectado] @${user} ejecutó ${firstWord}`);
-            const weightedPrize = this.selectWeightedJackpotPrize();
-            await this.executeSpinFlow(channel, user, weightedPrize, true);
-        }
     }
-    async executeSpinFlow(channel, username, prize, triggerSpinCmd) {
+    async executeSpinFlow(channel, username, prize) {
         const now = Date.now();
         const timeSinceLastSpin = now - this.lastSpinTimestamp;
         if (this.lastSpinTimestamp > 0 && timeSinceLastSpin < this.cooldownMs) {
             const remainingSeconds = Math.ceil((this.cooldownMs - timeSinceLastSpin) / 1000);
             const remainingMinutes = Math.floor(remainingSeconds / 60);
             const remainingSecs = remainingSeconds % 60;
-            this.logger.warn(`⛔ Ruleta pausada para @${username}: Cooldown activo (${remainingMinutes}m ${remainingSecs}s restantes). Puedes resetear con '!resetcooldown'`);
+            this.logger.warn(`⛔ Ruleta pausada para @${username}: Cooldown activo (${remainingMinutes}m ${remainingSecs}s restantes).`);
             return;
         }
         if (this.isSpinActive) {
@@ -230,18 +305,13 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.recentSpinUsers.set(username.toLowerCase(), now);
         try {
             this.logger.log(`🚀 [SECUENCIA CASINO INICIADA] Usuario: @${username} | Premio: ${prize.toLocaleString()} pts`);
-            if (triggerSpinCmd && this.client && this.isAuthenticated) {
-                const spinCmd = `!spin @${username}`;
-                await this.client.say(channel, spinCmd);
-                this.logger.log(`⏩ [PASO 1 ENVIADO COMO @${this.currentBotUsername}] ${spinCmd}`);
-            }
             this.casinoGateway.emitStartSpin({
                 username,
                 prize,
                 duration: 15000,
                 prizesList: this.ALL_PRIZES_POOL,
             });
-            this.logger.log('⏳ [PASO 2] Animación en OBS en progreso... Pago en 16s.');
+            this.logger.log('⏳ Animación en OBS en progreso... Entrega de puntos en 15.5s.');
             await this.sleep(this.SPIN_DURATION_MS);
             const cleanUser = username.replace(/^@/, '');
             let payCommand = this.pointsCommandPattern
@@ -252,7 +322,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
             }
             if (this.client && this.isAuthenticated) {
                 await this.client.say(channel, payCommand);
-                this.logger.log(`💰 [PASO 3 FINALIZADO - PAGO ENVIADO COMO @${this.currentBotUsername}] ${payCommand}`);
+                this.logger.log(`💰 [PAGO ENTREGADO A @${cleanUser}] Comando enviado al chat: ${payCommand}`);
             }
             else {
                 this.logger.warn(`⚠️ [TIRADA FINALIZADA (+${prize.toLocaleString()} pts para @${cleanUser})] -> Falta Token OAuth para enviar '${payCommand}' automáticamente. Configúralo en http://localhost:3000`);
@@ -263,7 +333,9 @@ let TwitchService = TwitchService_1 = class TwitchService {
         }
         finally {
             this.isSpinActive = false;
-            this.scheduleCooldownAnnouncements(channel);
+            if (this.announceCountdownInChat) {
+                this.scheduleCooldownAnnouncements(channel);
+            }
         }
     }
     clearCooldownTimers() {
@@ -283,19 +355,19 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.logger.log(`📢 [CHAT #${cleanChannel}] @${this.currentBotUsername}: ${message}`);
             return true;
         }
-        catch (error) {
-            this.logger.error(`❌ Error enviando mensaje a #${channel}:`, error);
+        catch (e) {
+            this.logger.error(`❌ Error al enviar mensaje al chat #${channel}:`, e);
             return false;
         }
     }
     scheduleCooldownAnnouncements(channel) {
         this.clearCooldownTimers();
-        if (!channel)
+        if (!channel || !this.announceCountdownInChat)
             return;
         const cooldownEndsAt = this.lastSpinTimestamp + this.cooldownMs;
         const msRemaining = cooldownEndsAt - Date.now();
         if (msRemaining <= 0) {
-            this.sendChatMessage(channel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨').catch(() => { });
+            this.sendChatMessage(channel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨').catch(() => { });
             return;
         }
         this.logger.log(`📢 Programando cuenta regresiva en el chat para el cooldown (${Math.round(msRemaining / 1000)}s restantes)...`);
@@ -318,7 +390,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.cooldownTimers.push(t1);
         }
         const t0 = setTimeout(() => {
-            this.sendChatMessage(channel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨');
+            this.sendChatMessage(channel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨');
             this.logger.log('🎉 [AVISO ENVIADO] ¡¡¡¡¡RULETA YA DISPONIBLE!!!!!');
             this.casinoGateway.emitTwitchStatus(this.getStatus());
         }, msRemaining);
@@ -340,7 +412,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.sendChatMessage(channel, '⏳ ¡La ruleta estará disponible en 1...');
         }, 2000);
         setTimeout(() => {
-            this.sendChatMessage(channel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨');
+            this.sendChatMessage(channel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨');
         }, 3000);
         return {
             success: true,
@@ -352,42 +424,53 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.lastSpinTimestamp = 0;
         this.isSpinActive = false;
         this.logger.log('🔄 Cooldown de tiradas reiniciado manualmente.');
-        if (this.currentChannel && this.client && this.isAuthenticated) {
-            this.sendChatMessage(this.currentChannel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨').catch(() => { });
+        if (this.announceCountdownInChat && this.currentChannel && this.client && this.isAuthenticated) {
+            this.sendChatMessage(this.currentChannel, '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨').catch(() => { });
         }
+    }
+    setTheme(theme) {
+        if (theme) {
+            this.currentTheme = theme;
+            this.saveConfigToDisk({
+                channel: this.currentChannel,
+                botUsername: this.currentBotUsername,
+                oauthToken: this.currentOauthToken,
+                pointsCommand: this.pointsCommandPattern,
+                cooldownSeconds: Math.round(this.cooldownMs / 1000),
+                theme: this.currentTheme,
+                announceCountdown: this.announceCountdownInChat,
+            });
+            return { success: true, theme: this.currentTheme };
+        }
+        return { success: false, theme: this.currentTheme };
+    }
+    setCountdownAnnouncement(enabled) {
+        this.announceCountdownInChat = enabled;
+        this.saveConfigToDisk({
+            channel: this.currentChannel,
+            botUsername: this.currentBotUsername,
+            oauthToken: this.currentOauthToken,
+            pointsCommand: this.pointsCommandPattern,
+            cooldownSeconds: Math.round(this.cooldownMs / 1000),
+            theme: this.currentTheme,
+            announceCountdown: this.announceCountdownInChat,
+        });
+        return { success: true, enabled: this.announceCountdownInChat };
     }
     setCooldownSeconds(seconds) {
         if (!isNaN(seconds) && seconds >= 0) {
             this.cooldownMs = seconds * 1000;
             this.logger.log(`⏱️ Cooldown modificado a ${seconds} segundos (${Math.round(seconds / 60)} min).`);
-            try {
-                const envContent = [
-                    `# =========================================================================`,
-                    `# CONFIGURACIÓN DEL CASINO TWITCH`,
-                    `# =========================================================================`,
-                    `TWITCH_CHANNEL=${this.currentChannel}`,
-                    `TWITCH_BOT_USERNAME=${this.currentBotUsername}`,
-                    `TWITCH_OAUTH_TOKEN=${this.currentOauthToken}`,
-                    `POINTS_COMMAND=${this.pointsCommandPattern}`,
-                    `COOLDOWN_SECONDS=${Math.round(this.cooldownMs / 1000)}`,
-                    `PORT=${process.env.PORT || 3000}`,
-                ].join('\n');
-                const candidatePaths = [
-                    path.resolve(process.cwd(), '.env'),
-                    path.resolve(process.cwd(), 'backend', '.env'),
-                    path.resolve(process.cwd(), '..', 'backend', '.env'),
-                ];
-                for (const p of candidatePaths) {
-                    try {
-                        if (fs.existsSync(path.dirname(p))) {
-                            fs.writeFileSync(p, envContent, 'utf-8');
-                        }
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-            if (this.currentChannel) {
+            this.saveConfigToDisk({
+                channel: this.currentChannel,
+                botUsername: this.currentBotUsername,
+                oauthToken: this.currentOauthToken,
+                pointsCommand: this.pointsCommandPattern,
+                cooldownSeconds: seconds,
+                theme: this.currentTheme,
+                announceCountdown: this.announceCountdownInChat,
+            });
+            if (this.announceCountdownInChat && this.currentChannel) {
                 this.scheduleCooldownAnnouncements(this.currentChannel);
             }
             return {
@@ -407,41 +490,21 @@ let TwitchService = TwitchService_1 = class TwitchService {
         if (config.cooldownSeconds && !isNaN(Number(config.cooldownSeconds))) {
             this.cooldownMs = Number(config.cooldownSeconds) * 1000;
         }
-        try {
-            const envContent = [
-                `# =========================================================================`,
-                `# CONFIGURACIÓN DEL CASINO TWITCH`,
-                `# =========================================================================`,
-                `TWITCH_CHANNEL=${this.currentChannel}`,
-                `TWITCH_BOT_USERNAME=${this.currentBotUsername}`,
-                `TWITCH_OAUTH_TOKEN=${this.currentOauthToken}`,
-                `POINTS_COMMAND=${this.pointsCommandPattern}`,
-                `COOLDOWN_SECONDS=${Math.round(this.cooldownMs / 1000)}`,
-                `PORT=${process.env.PORT || 3000}`,
-            ].join('\n');
-            const candidatePaths = [
-                path.resolve(process.cwd(), '.env'),
-                path.resolve(process.cwd(), 'backend', '.env'),
-                path.resolve(process.cwd(), '..', 'backend', '.env'),
-            ];
-            let saved = false;
-            for (const p of candidatePaths) {
-                try {
-                    if (fs.existsSync(path.dirname(p))) {
-                        fs.writeFileSync(p, envContent, 'utf-8');
-                        this.logger.log(`💾 Configuración guardada en ${p}`);
-                        saved = true;
-                    }
-                }
-                catch { }
-            }
-            if (!saved) {
-                fs.writeFileSync(path.resolve(process.cwd(), '.env'), envContent, 'utf-8');
-            }
+        if (config.theme) {
+            this.currentTheme = config.theme;
         }
-        catch (e) {
-            this.logger.warn('No se pudo escribir en .env, usando configuración en memoria.');
+        if (config.announceCountdown !== undefined) {
+            this.announceCountdownInChat = config.announceCountdown === true;
         }
+        this.saveConfigToDisk({
+            channel: this.currentChannel,
+            botUsername: this.currentBotUsername,
+            oauthToken: this.currentOauthToken,
+            pointsCommand: this.pointsCommandPattern,
+            cooldownSeconds: Math.round(this.cooldownMs / 1000),
+            theme: this.currentTheme,
+            announceCountdown: this.announceCountdownInChat,
+        });
         if (this.currentChannel) {
             await this.connectToTwitch();
             return {
@@ -466,11 +529,25 @@ let TwitchService = TwitchService_1 = class TwitchService {
             isSpinActive: this.isSpinActive,
             cooldownSeconds: Math.round(this.cooldownMs / 1000),
             pointsCommand: this.pointsCommandPattern,
+            theme: this.currentTheme,
+            announceCountdown: this.announceCountdownInChat,
             isConfigured: Boolean(this.currentChannel && this.currentChannel.trim() !== ''),
         };
     }
     sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    selectWeightedJackpotPrize() {
+        const totalWeight = this.PRIZE_TIERS.reduce((sum, tier) => sum + tier.weight, 0);
+        let randomNum = Math.random() * totalWeight;
+        for (const tier of this.PRIZE_TIERS) {
+            if (randomNum < tier.weight) {
+                const randomIndex = Math.floor(Math.random() * tier.prizes.length);
+                return tier.prizes[randomIndex];
+            }
+            randomNum -= tier.weight;
+        }
+        return 10;
     }
 };
 exports.TwitchService = TwitchService;

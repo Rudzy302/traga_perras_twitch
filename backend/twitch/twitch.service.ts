@@ -17,6 +17,8 @@ export interface TwitchConfig {
   oauthToken?: string;
   pointsCommand?: string;
   cooldownSeconds?: number;
+  theme?: string;
+  announceCountdown?: boolean;
 }
 
 export interface PrizeTier {
@@ -30,13 +32,15 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   private client: tmi.Client | null = null;
   private isAuthenticated = false;
 
-  private currentChannel = process.env.TWITCH_CHANNEL || '';
-  private currentBotUsername = process.env.TWITCH_BOT_USERNAME || '';
-  private currentOauthToken = process.env.TWITCH_OAUTH_TOKEN || '';
-  private pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
+  private currentChannel = '';
+  private currentBotUsername = '';
+  private currentOauthToken = '';
+  private pointsCommandPattern = '!points add {user} {prize}';
+  private currentTheme = 'carnival-green';
+  private announceCountdownInChat = false;
 
   // Configuración de tiempos
-  private readonly SPIN_DURATION_MS = 16000; // 16s (tragaperras dura 15s)
+  private readonly SPIN_DURATION_MS = 15500; // 15.5s (tragaperras dura 15s)
 
   // Cooldown de 5 MINUTOS exactos (300 segundos) para respetar la regla de BotRix
   private cooldownMs = 5 * 60 * 1000; // 300,000 ms
@@ -93,19 +97,9 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   ) { }
 
   async onModuleInit() {
-    this.currentChannel = process.env.TWITCH_CHANNEL || '';
-    this.currentBotUsername = process.env.TWITCH_BOT_USERNAME || this.currentChannel;
-    this.currentOauthToken = process.env.TWITCH_OAUTH_TOKEN || '';
-    this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
+    this.loadConfigFromDisk();
 
-    const envCooldown = process.env.COOLDOWN_SECONDS;
-    if (envCooldown && !isNaN(Number(envCooldown))) {
-      this.cooldownMs = Number(envCooldown) * 1000;
-      this.logger.log(`⏱️ Cooldown configurado a ${envCooldown} segundos.`);
-    } else {
-      this.cooldownMs = 5 * 60 * 1000; // 5 minutos por defecto
-      this.logger.log('⏱️ Cooldown configurado a 5 MINUTOS (300 segundos).');
-    }
+    this.logger.log(`⏱️ Cooldown configurado a ${Math.round(this.cooldownMs / 1000)} segundos.`);
 
     if (this.currentChannel.trim() !== '') {
       await this.connectToTwitch();
@@ -118,6 +112,138 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     await this.disconnectFromTwitch();
+  }
+
+  /**
+   * Rutas candidatas para buscar o guardar archivos de configuración
+   */
+  private getCandidateFilePaths(fileName: string): string[] {
+    const cwd = process.cwd();
+    return [
+      path.resolve(cwd, fileName),
+      path.resolve(cwd, 'backend', fileName),
+      path.resolve(cwd, '..', fileName),
+      path.resolve(__dirname, '..', '..', fileName),
+      path.resolve(__dirname, '..', fileName),
+      path.resolve(__dirname, fileName),
+    ];
+  }
+
+  /**
+   * Guarda de forma permanente la configuración en casino_config.json y en .env
+   */
+  public saveConfigToDisk(data: {
+    channel: string;
+    botUsername: string;
+    oauthToken: string;
+    pointsCommand: string;
+    cooldownSeconds: number;
+    theme?: string;
+    announceCountdown?: boolean;
+  }): void {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const envContent = [
+      `# =========================================================================`,
+      `# CONFIGURACIÓN DEL CASINO TWITCH - PERSISTENCIA PERMANENTE`,
+      `# =========================================================================`,
+      `TWITCH_CHANNEL=${data.channel}`,
+      `TWITCH_BOT_USERNAME=${data.botUsername}`,
+      `TWITCH_OAUTH_TOKEN=${data.oauthToken}`,
+      `POINTS_COMMAND=${data.pointsCommand}`,
+      `COOLDOWN_SECONDS=${data.cooldownSeconds}`,
+      `THEME=${data.theme || 'carnival-green'}`,
+      `ANNOUNCE_COUNTDOWN=${data.announceCountdown ? 'true' : 'false'}`,
+      `PORT=${process.env.PORT || 3000}`,
+    ].join('\n');
+
+    // 1. Guardar casino_config.json
+    for (const p of this.getCandidateFilePaths('casino_config.json')) {
+      try {
+        const dir = path.dirname(p);
+        if (fs.existsSync(dir)) {
+          fs.writeFileSync(p, jsonStr, 'utf-8');
+          this.logger.log(`💾 [Config JSON Guardado]: ${p}`);
+        }
+      } catch {}
+    }
+
+    // 2. Guardar .env
+    for (const p of this.getCandidateFilePaths('.env')) {
+      try {
+        const dir = path.dirname(p);
+        if (fs.existsSync(dir)) {
+          fs.writeFileSync(p, envContent, 'utf-8');
+          this.logger.log(`💾 [.env Guardado]: ${p}`);
+        }
+      } catch {}
+    }
+  }
+
+  /**
+   * Carga la configuración desde casino_config.json o desde .env
+   */
+  private loadConfigFromDisk(): void {
+    // 1. Intentar cargar desde casino_config.json
+    for (const p of this.getCandidateFilePaths('casino_config.json')) {
+      try {
+        if (fs.existsSync(p)) {
+          const raw = fs.readFileSync(p, 'utf-8');
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            this.currentChannel = (parsed.channel || '').trim();
+            this.currentBotUsername = (parsed.botUsername || this.currentChannel).trim();
+            this.currentOauthToken = (parsed.oauthToken || '').trim();
+            this.pointsCommandPattern = parsed.pointsCommand || '!points add {user} {prize}';
+            this.cooldownMs = (Number(parsed.cooldownSeconds) || 300) * 1000;
+            this.currentTheme = parsed.theme || 'carnival-green';
+            this.announceCountdownInChat = parsed.announceCountdown === true;
+            this.logger.log(`📂 [Config Cargada desde JSON ${p}]: Canal #${this.currentChannel} | Cooldown ${parsed.cooldownSeconds}s`);
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Intentar cargar desde .env
+    for (const p of this.getCandidateFilePaths('.env')) {
+      try {
+        if (fs.existsSync(p)) {
+          const raw = fs.readFileSync(p, 'utf-8');
+          const lines = raw.split('\n');
+          const envMap: Record<string, string> = {};
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+              const idx = trimmed.indexOf('=');
+              const key = trimmed.substring(0, idx).trim();
+              const val = trimmed.substring(idx + 1).trim();
+              envMap[key] = val;
+            }
+          }
+
+          if (envMap.TWITCH_CHANNEL) {
+            this.currentChannel = (envMap.TWITCH_CHANNEL || '').trim();
+            this.currentBotUsername = (envMap.TWITCH_BOT_USERNAME || this.currentChannel).trim();
+            this.currentOauthToken = (envMap.TWITCH_OAUTH_TOKEN || '').trim();
+            this.pointsCommandPattern = envMap.POINTS_COMMAND || '!points add {user} {prize}';
+            this.cooldownMs = (Number(envMap.COOLDOWN_SECONDS) || 300) * 1000;
+            this.currentTheme = envMap.THEME || 'carnival-green';
+            this.announceCountdownInChat = envMap.ANNOUNCE_COUNTDOWN === 'true';
+            this.logger.log(`📂 [Config Cargada desde .env ${p}]: Canal #${this.currentChannel}`);
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Fallback a variables de entorno del sistema
+    this.currentChannel = process.env.TWITCH_CHANNEL || '';
+    this.currentBotUsername = process.env.TWITCH_BOT_USERNAME || this.currentChannel;
+    this.currentOauthToken = process.env.TWITCH_OAUTH_TOKEN || '';
+    this.pointsCommandPattern = process.env.POINTS_COMMAND || '!points add {user} {prize}';
+    this.cooldownMs = (Number(process.env.COOLDOWN_SECONDS) || 300) * 1000;
+    this.currentTheme = 'carnival-green';
+    this.announceCountdownInChat = false;
   }
 
   private async disconnectFromTwitch(): Promise<void> {
@@ -141,102 +267,76 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const channelName = this.currentChannel.trim().replace(/^#/, '');
-    const formattedChannel = `#${channelName.toLowerCase()}`;
+    const cleanChannel = this.currentChannel.replace(/^#/, '');
+
+    // Formatear token si viene sin el prefijo 'oauth:'
+    let formattedToken = (this.currentOauthToken || '').trim();
+    if (formattedToken && !formattedToken.startsWith('oauth:')) {
+      formattedToken = `oauth:${formattedToken}`;
+    }
 
     const clientOptions: tmi.Options = {
       options: { debug: false },
-      connection: {
-        secure: true,
-        reconnect: true,
-      },
-      channels: [formattedChannel],
+      channels: [cleanChannel],
     };
 
-    if (this.currentOauthToken.trim() !== '') {
-      const oauthPassword = this.currentOauthToken.startsWith('oauth:')
-        ? this.currentOauthToken
-        : `oauth:${this.currentOauthToken}`;
-
-      const botUser = (this.currentBotUsername || channelName).trim().replace(/^@/, '');
-
+    if (formattedToken && formattedToken.length > 6) {
+      // MODO AUTENTICADO: Lee el chat y puede enviar comandos (!points add ...)
+      const botNick = this.currentBotUsername || cleanChannel;
       clientOptions.identity = {
-        username: botUser.toLowerCase(),
-        password: oauthPassword,
+        username: botNick,
+        password: formattedToken,
       };
       this.isAuthenticated = true;
       this.logger.log(
-        `🔐 MODO AUTENTICADO ACTIVO como @${clientOptions.identity.username} en canal ${formattedChannel}. Los premios se enviarán automáticamente.`,
+        `🔐 Conectando a Twitch en MODO AUTENTICADO como @${botNick} en #${cleanChannel}...`,
       );
     } else {
+      // MODO SÓLO LECTURA: Permite que la ruleta visual funcione escuchando !spin sin pagar puntos
       this.isAuthenticated = false;
       this.logger.warn(
-        `👀 MODO SÓLO LECTURA activo para ${formattedChannel}. Falta TWITCH_OAUTH_TOKEN para que el bot pueda enviar puntos automáticamente.`,
+        `👁️ Conectando a Twitch en MODO SÓLO LECTURA anónimo en #${cleanChannel} (Sin Token OAuth). La ruleta visual funcionará pero no podrá enviar comandos de puntos.`,
       );
     }
-
-    this.client = new tmi.Client(clientOptions);
-
-    this.client.on('message', (chan, tags, message, self) => {
-      this.handleChatMessage(chan, tags, message, self);
-    });
-
-    this.client.on('connected', (address, port) => {
-      this.logger.log(
-        `✅ CONEXIÓN EXITOSA con Twitch Chat (${address}:${port}) en canal: ${formattedChannel}`,
-      );
-    });
 
     try {
+      this.client = new tmi.Client(clientOptions);
+
+      this.client.on('message', (channel, tags, message, self) => {
+        // Ignorar mensajes enviados por el bot para evitar bucles
+        if (self) return;
+        this.handleChatMessage(channel, tags, message);
+      });
+
+      this.client.on('connected', (addr, port) => {
+        this.logger.log(`✅ [Twitch IRC Conectado] en ${addr}:${port} | Canal: #${cleanChannel}`);
+        this.casinoGateway.emitTwitchStatus(this.getStatus());
+      });
+
+      this.client.on('disconnected', (reason) => {
+        this.logger.warn(`🔌 [Twitch IRC Desconectado]: ${reason}`);
+        this.isAuthenticated = false;
+        this.casinoGateway.emitTwitchStatus(this.getStatus());
+      });
+
       await this.client.connect();
     } catch (error) {
-      this.logger.error(`❌ Error conectando al chat de ${formattedChannel}:`, error);
+      this.logger.error(`❌ Error al conectar con Twitch: ${error.message || error}`);
+      this.isAuthenticated = false;
+      this.casinoGateway.emitTwitchStatus(this.getStatus());
     }
   }
 
   /**
-   * Selecciona un premio según la distribución ponderada tipo Jackpot
-   */
-  public selectWeightedJackpotPrize(): number {
-    const totalWeight = this.PRIZE_TIERS.reduce((sum, tier) => sum + tier.weight, 0);
-    let random = Math.random() * totalWeight;
-
-    for (const tier of this.PRIZES_TIERS_SAFE) {
-      if (random < tier.weight) {
-        return tier.prizes[Math.floor(Math.random() * tier.prizes.length)];
-      }
-      random -= tier.weight;
-    }
-
-    return 10;
-  }
-
-  private get PRIZES_TIERS_SAFE(): PrizeTier[] {
-    return this.PRIZE_TIERS;
-  }
-
-  /**
-   * Procesa los mensajes del chat y respeta el cooldown
+   * Procesa mensajes de chat para detectar !spin y !ruleta
    */
   private async handleChatMessage(
     channel: string,
     tags: tmi.ChatUserstate,
     message: string,
-    self: boolean,
   ): Promise<void> {
     const trimmedMsg = message.trim();
-    const sender = tags['display-name'] || tags.username || 'usuario';
-
-    // Evitar procesar nuestros propios mensajes de comando para no hacer bucles
-    if (
-      trimmedMsg.startsWith('!points add') ||
-      trimmedMsg.startsWith('!p ') ||
-      trimmedMsg === '!p'
-    ) {
-      return;
-    }
-
-    this.logger.log(`💬 [Chat ${channel}] ${sender}: ${trimmedMsg}`);
+    const sender = tags['display-name'] || tags.username || 'Viewer';
 
     // Detección si BotRix rechaza por cooldown ("the item is on cooldown")
     if (trimmedMsg.toLowerCase().includes('the item is on cooldown') || trimmedMsg.toLowerCase().includes('is on cooldown')) {
@@ -267,15 +367,21 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `🎯 [BotRix Detectado] @${targetUser} ganó ${botrixPrize} pts. Ejecutando ruleta...`,
       );
-      await this.executeSpinFlow(channel, targetUser, botrixPrize, false);
+      await this.executeSpinFlow(channel, targetUser, botrixPrize);
       return;
     }
 
     // =========================================================================
-    // CASO 2: CANJE DE TIENDA O COMANDO !spin
+    // CASO 2: COMANDO !spin (o !ruleta) EN EL CHAT DE TWITCH
+    // Solo ejecuta la acción visual sin retornar mensajes invasivos en el chat.
     // =========================================================================
-    const spinMatch = trimmedMsg.match(/^!spin(?:\s+@?(\w+))?/i);
-    if (spinMatch && !trimmedMsg.toLowerCase().startsWith('!ruleta')) {
+    const spinMatch = trimmedMsg.match(/^!(?:spin|ruleta)(?:\s+@?(\w+))?/i);
+    if (spinMatch) {
+      // Si el mensaje fue enviado por el propio bot del streamer, ignorar
+      if (this.currentBotUsername && sender.toLowerCase() === this.currentBotUsername.toLowerCase()) {
+        return;
+      }
+
       const targetUser = (spinMatch[1] || sender).replace(/^@/, '');
 
       const lastUserSpin = this.recentSpinUsers.get(targetUser.toLowerCase()) || 0;
@@ -283,39 +389,23 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      this.logger.log(`🎰 [Comando !spin Detectado] para @${targetUser}`);
+      this.logger.log(`🎰 [Comando !spin Detectado] @${targetUser} activó la ruleta`);
       const weightedPrize = this.selectWeightedJackpotPrize();
-      await this.executeSpinFlow(channel, targetUser, weightedPrize, false);
+      await this.executeSpinFlow(channel, targetUser, weightedPrize);
       return;
-    }
-
-    // =========================================================================
-    // CASO 3: SECUENCIA !ruleta -> !spin -> pago
-    // =========================================================================
-    const firstWord = trimmedMsg.toLowerCase().split(' ')[0];
-    if (firstWord === '!ruleta' || firstWord === '!ruletaa') {
-      const user = sender.replace(/^@/, '');
-
-      const lastUserSpin = this.recentSpinUsers.get(user.toLowerCase()) || 0;
-      if (Date.now() - lastUserSpin < 3000) {
-        return;
-      }
-
-      this.logger.log(`🎰 [Comando !ruleta Detectado] @${user} ejecutó ${firstWord}`);
-      const weightedPrize = this.selectWeightedJackpotPrize();
-
-      await this.executeSpinFlow(channel, user, weightedPrize, true);
     }
   }
 
   /**
-   * Orquesta la secuencia completa respetando el cooldown
+   * Orquesta la secuencia completa:
+   * 1. Comprueba cooldown (si está en cooldown, no hace nada ni envía mensajes invasivos).
+   * 2. Lanza animación visual en OBS sin emitir texto en el chat.
+   * 3. Tras 15.5s, envía el comando de puntos al ganador.
    */
   private async executeSpinFlow(
     channel: string,
     username: string,
     prize: number,
-    triggerSpinCmd: boolean,
   ): Promise<void> {
     const now = Date.now();
 
@@ -326,8 +416,9 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       const remainingMinutes = Math.floor(remainingSeconds / 60);
       const remainingSecs = remainingSeconds % 60;
       this.logger.warn(
-        `⛔ Ruleta pausada para @${username}: Cooldown activo (${remainingMinutes}m ${remainingSecs}s restantes). Puedes resetear con '!resetcooldown'`,
+        `⛔ Ruleta pausada para @${username}: Cooldown activo (${remainingMinutes}m ${remainingSecs}s restantes).`,
       );
+      // NUNCA mandar mensajes al chat durante cooldown para no ser invasivo
       return;
     }
 
@@ -345,14 +436,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
         `🚀 [SECUENCIA CASINO INICIADA] Usuario: @${username} | Premio: ${prize.toLocaleString()} pts`,
       );
 
-      // PASO 1: Si vino por !ruleta, ejecutar '!spin @usuario'
-      if (triggerSpinCmd && this.client && this.isAuthenticated) {
-        const spinCmd = `!spin @${username}`;
-        await this.client.say(channel, spinCmd);
-        this.logger.log(`⏩ [PASO 1 ENVIADO COMO @${this.currentBotUsername}] ${spinCmd}`);
-      }
-
-      // PASO 2: Emitir evento WebSocket a OBS con el pool completo
+      // PASO 1: Emitir evento WebSocket a OBS (cero texto previo en el chat de Twitch)
       this.casinoGateway.emitStartSpin({
         username,
         prize,
@@ -360,11 +444,11 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
         prizesList: this.ALL_PRIZES_POOL,
       });
 
-      // PASO 3: Esperar 16 segundos exactos (tragaperras dura 15s)
-      this.logger.log('⏳ [PASO 2] Animación en OBS en progreso... Pago en 16s.');
+      // PASO 2: Esperar 15.5 segundos exactos (animación de tragaperras en OBS)
+      this.logger.log('⏳ Animación en OBS en progreso... Entrega de puntos en 15.5s.');
       await this.sleep(this.SPIN_DURATION_MS);
 
-      // PASO 4: Enviar comando de recompensa en el chat
+      // PASO 3: Una vez terminada la ruleta, enviar comando para pagar puntos al viewer que lanzó !spin
       const cleanUser = username.replace(/^@/, '');
       let payCommand = this.pointsCommandPattern
         .replace(/{user}/g, cleanUser)
@@ -377,7 +461,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
 
       if (this.client && this.isAuthenticated) {
         await this.client.say(channel, payCommand);
-        this.logger.log(`💰 [PASO 3 FINALIZADO - PAGO ENVIADO COMO @${this.currentBotUsername}] ${payCommand}`);
+        this.logger.log(`💰 [PAGO ENTREGADO A @${cleanUser}] Comando enviado al chat: ${payCommand}`);
       } else {
         this.logger.warn(
           `⚠️ [TIRADA FINALIZADA (+${prize.toLocaleString()} pts para @${cleanUser})] -> Falta Token OAuth para enviar '${payCommand}' automáticamente. Configúralo en http://localhost:3000`,
@@ -387,7 +471,9 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`❌ Error en tirada para @${username}:`, error);
     } finally {
       this.isSpinActive = false;
-      this.scheduleCooldownAnnouncements(channel);
+      if (this.announceCountdownInChat) {
+        this.scheduleCooldownAnnouncements(channel);
+      }
     }
   }
 
@@ -413,19 +499,19 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       await this.client.say(cleanChannel, message);
       this.logger.log(`📢 [CHAT #${cleanChannel}] @${this.currentBotUsername}: ${message}`);
       return true;
-    } catch (error) {
-      this.logger.error(`❌ Error enviando mensaje a #${channel}:`, error);
+    } catch (e) {
+      this.logger.error(`❌ Error al enviar mensaje al chat #${channel}:`, e);
       return false;
     }
   }
 
   /**
-   * Programa la cuenta regresiva en el chat de Twitch: 3, 2, 1... ¡¡¡¡¡RULETA YA DISPONIBLE!!!!!
+   * Programa la cuenta regresiva en el chat de Twitch (solo si announceCountdownInChat está habilitado)
    */
   public scheduleCooldownAnnouncements(channel: string): void {
     this.clearCooldownTimers();
 
-    if (!channel) return;
+    if (!channel || !this.announceCountdownInChat) return;
 
     const cooldownEndsAt = this.lastSpinTimestamp + this.cooldownMs;
     const msRemaining = cooldownEndsAt - Date.now();
@@ -433,7 +519,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     if (msRemaining <= 0) {
       this.sendChatMessage(
         channel,
-        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨',
+        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨',
       ).catch(() => {});
       return;
     }
@@ -470,7 +556,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     const t0 = setTimeout(() => {
       this.sendChatMessage(
         channel,
-        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨',
+        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨',
       );
       this.logger.log('🎉 [AVISO ENVIADO] ¡¡¡¡¡RULETA YA DISPONIBLE!!!!!');
       this.casinoGateway.emitTwitchStatus(this.getStatus());
@@ -500,7 +586,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     setTimeout(() => {
       this.sendChatMessage(
         channel,
-        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨',
+        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨',
       );
     }, 3000);
 
@@ -518,50 +604,70 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     this.lastSpinTimestamp = 0;
     this.isSpinActive = false;
     this.logger.log('🔄 Cooldown de tiradas reiniciado manualmente.');
-    if (this.currentChannel && this.client && this.isAuthenticated) {
+    if (this.announceCountdownInChat && this.currentChannel && this.client && this.isAuthenticated) {
       this.sendChatMessage(
         this.currentChannel,
-        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨',
+        '🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !spin para girar 🎰✨',
       ).catch(() => {});
     }
   }
 
   /**
-   * Modifica el tiempo de cooldown en segundos y lo persiste en .env
+   * Modifica el tema visual y lo persiste
+   */
+  public setTheme(theme: string): { success: boolean; theme: string } {
+    if (theme) {
+      this.currentTheme = theme;
+      this.saveConfigToDisk({
+        channel: this.currentChannel,
+        botUsername: this.currentBotUsername,
+        oauthToken: this.currentOauthToken,
+        pointsCommand: this.pointsCommandPattern,
+        cooldownSeconds: Math.round(this.cooldownMs / 1000),
+        theme: this.currentTheme,
+        announceCountdown: this.announceCountdownInChat,
+      });
+      return { success: true, theme: this.currentTheme };
+    }
+    return { success: false, theme: this.currentTheme };
+  }
+
+  /**
+   * Modifica la opción de avisar cuenta regresiva en el chat
+   */
+  public setCountdownAnnouncement(enabled: boolean): { success: boolean; enabled: boolean } {
+    this.announceCountdownInChat = enabled;
+    this.saveConfigToDisk({
+      channel: this.currentChannel,
+      botUsername: this.currentBotUsername,
+      oauthToken: this.currentOauthToken,
+      pointsCommand: this.pointsCommandPattern,
+      cooldownSeconds: Math.round(this.cooldownMs / 1000),
+      theme: this.currentTheme,
+      announceCountdown: this.announceCountdownInChat,
+    });
+    return { success: true, enabled: this.announceCountdownInChat };
+  }
+
+  /**
+   * Modifica el tiempo de cooldown en segundos y lo persiste permanentemente
    */
   public setCooldownSeconds(seconds: number): { success: boolean; message: string } {
     if (!isNaN(seconds) && seconds >= 0) {
       this.cooldownMs = seconds * 1000;
       this.logger.log(`⏱️ Cooldown modificado a ${seconds} segundos (${Math.round(seconds / 60)} min).`);
 
-      try {
-        const envContent = [
-          `# =========================================================================`,
-          `# CONFIGURACIÓN DEL CASINO TWITCH`,
-          `# =========================================================================`,
-          `TWITCH_CHANNEL=${this.currentChannel}`,
-          `TWITCH_BOT_USERNAME=${this.currentBotUsername}`,
-          `TWITCH_OAUTH_TOKEN=${this.currentOauthToken}`,
-          `POINTS_COMMAND=${this.pointsCommandPattern}`,
-          `COOLDOWN_SECONDS=${Math.round(this.cooldownMs / 1000)}`,
-          `PORT=${process.env.PORT || 3000}`,
-        ].join('\n');
+      this.saveConfigToDisk({
+        channel: this.currentChannel,
+        botUsername: this.currentBotUsername,
+        oauthToken: this.currentOauthToken,
+        pointsCommand: this.pointsCommandPattern,
+        cooldownSeconds: seconds,
+        theme: this.currentTheme,
+        announceCountdown: this.announceCountdownInChat,
+      });
 
-        const candidatePaths = [
-          path.resolve(process.cwd(), '.env'),
-          path.resolve(process.cwd(), 'backend', '.env'),
-          path.resolve(process.cwd(), '..', 'backend', '.env'),
-        ];
-        for (const p of candidatePaths) {
-          try {
-            if (fs.existsSync(path.dirname(p))) {
-              fs.writeFileSync(p, envContent, 'utf-8');
-            }
-          } catch {}
-        }
-      } catch {}
-
-      if (this.currentChannel) {
+      if (this.announceCountdownInChat && this.currentChannel) {
         this.scheduleCooldownAnnouncements(this.currentChannel);
       }
 
@@ -574,7 +680,7 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Reconfiguración dinámica en caliente desde el panel web
+   * Reconfiguración dinámica en caliente desde el panel web con persistencia total
    */
   public async reconfigure(config: TwitchConfig): Promise<{ success: boolean; message: string }> {
     this.currentChannel = (config.channel || '').trim().replace(/^#/, '');
@@ -589,40 +695,23 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       this.cooldownMs = Number(config.cooldownSeconds) * 1000;
     }
 
-    try {
-      const envContent = [
-        `# =========================================================================`,
-        `# CONFIGURACIÓN DEL CASINO TWITCH`,
-        `# =========================================================================`,
-        `TWITCH_CHANNEL=${this.currentChannel}`,
-        `TWITCH_BOT_USERNAME=${this.currentBotUsername}`,
-        `TWITCH_OAUTH_TOKEN=${this.currentOauthToken}`,
-        `POINTS_COMMAND=${this.pointsCommandPattern}`,
-        `COOLDOWN_SECONDS=${Math.round(this.cooldownMs / 1000)}`,
-        `PORT=${process.env.PORT || 3000}`,
-      ].join('\n');
-
-      const candidatePaths = [
-        path.resolve(process.cwd(), '.env'),
-        path.resolve(process.cwd(), 'backend', '.env'),
-        path.resolve(process.cwd(), '..', 'backend', '.env'),
-      ];
-      let saved = false;
-      for (const p of candidatePaths) {
-        try {
-          if (fs.existsSync(path.dirname(p))) {
-            fs.writeFileSync(p, envContent, 'utf-8');
-            this.logger.log(`💾 Configuración guardada en ${p}`);
-            saved = true;
-          }
-        } catch {}
-      }
-      if (!saved) {
-        fs.writeFileSync(path.resolve(process.cwd(), '.env'), envContent, 'utf-8');
-      }
-    } catch (e) {
-      this.logger.warn('No se pudo escribir en .env, usando configuración en memoria.');
+    if (config.theme) {
+      this.currentTheme = config.theme;
     }
+
+    if (config.announceCountdown !== undefined) {
+      this.announceCountdownInChat = config.announceCountdown === true;
+    }
+
+    this.saveConfigToDisk({
+      channel: this.currentChannel,
+      botUsername: this.currentBotUsername,
+      oauthToken: this.currentOauthToken,
+      pointsCommand: this.pointsCommandPattern,
+      cooldownSeconds: Math.round(this.cooldownMs / 1000),
+      theme: this.currentTheme,
+      announceCountdown: this.announceCountdownInChat,
+    });
 
     if (this.currentChannel) {
       await this.connectToTwitch();
@@ -648,6 +737,8 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       isSpinActive: this.isSpinActive,
       cooldownSeconds: Math.round(this.cooldownMs / 1000),
       pointsCommand: this.pointsCommandPattern,
+      theme: this.currentTheme,
+      announceCountdown: this.announceCountdownInChat,
       isConfigured: Boolean(this.currentChannel && this.currentChannel.trim() !== ''),
     };
   }
@@ -655,5 +746,22 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
-}
 
+  /**
+   * Selecciona un premio ponderado usando la distribución de 5 Tiers
+   */
+  private selectWeightedJackpotPrize(): number {
+    const totalWeight = this.PRIZE_TIERS.reduce((sum, tier) => sum + tier.weight, 0);
+    let randomNum = Math.random() * totalWeight;
+
+    for (const tier of this.PRIZE_TIERS) {
+      if (randomNum < tier.weight) {
+        const randomIndex = Math.floor(Math.random() * tier.prizes.length);
+        return tier.prizes[randomIndex];
+      }
+      randomNum -= tier.weight;
+    }
+
+    return 10;
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import SlotMachine from './SlotMachine';
+import { io, Socket } from 'socket.io-client';
+import SlotMachine, { SlotTheme } from './SlotMachine';
 import StreamerDashboard from './StreamerDashboard';
 import './App.css';
 
@@ -10,6 +11,22 @@ export const App: React.FC = () => {
     return params.get('overlay') === 'true' || params.has('obs');
   });
 
+  const [syncedTheme, setSyncedTheme] = useState<SlotTheme>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlTheme = params.get('theme') as SlotTheme;
+      if (urlTheme) return urlTheme;
+      try {
+        const saved = localStorage.getItem('casino_streamer_config_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.selectedTheme) return parsed.selectedTheme;
+        }
+      } catch {}
+    }
+    return 'carnival-green';
+  });
+
   useEffect(() => {
     if (isOverlayMode) {
       document.body.classList.add('overlay-mode');
@@ -17,6 +34,40 @@ export const App: React.FC = () => {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
       document.body.style.background = 'transparent';
+
+      // Conectar socket para sincronizar tema en tiempo real si cambia en el dashboard
+      const wsUrl =
+        typeof window !== 'undefined'
+          ? window.location.port === '5173'
+            ? 'http://localhost:3000'
+            : window.location.origin
+          : 'http://localhost:3000';
+
+      const s: Socket = io(wsUrl, {
+        transports: ['websocket', 'polling'],
+      });
+
+      s.on('theme-change', (newTheme: SlotTheme) => {
+        if (newTheme) {
+          const params = new URLSearchParams(window.location.search);
+          if (!params.has('theme')) {
+            setSyncedTheme(newTheme);
+          }
+        }
+      });
+
+      s.on('twitch-status', (status: { theme?: SlotTheme }) => {
+        if (status?.theme) {
+          const params = new URLSearchParams(window.location.search);
+          if (!params.has('theme')) {
+            setSyncedTheme(status.theme);
+          }
+        }
+      });
+
+      return () => {
+        s.disconnect();
+      };
     } else {
       document.body.classList.add('dashboard-mode');
       document.body.classList.remove('overlay-mode');
@@ -29,11 +80,11 @@ export const App: React.FC = () => {
 
   if (isOverlayMode) {
     const params = new URLSearchParams(window.location.search);
-    const themeParam = params.get('theme') as any;
+    const themeParam = (params.get('theme') as SlotTheme) || syncedTheme;
 
     return (
       <main className="obs-overlay-main">
-        <SlotMachine isOverlayMode={true} theme={themeParam || 'carnival-green'} />
+        <SlotMachine isOverlayMode={true} theme={themeParam} />
       </main>
     );
   }

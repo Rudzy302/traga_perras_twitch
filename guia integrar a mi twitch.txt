@@ -105,21 +105,21 @@ En el panel principal tienes:
 - Botón "🔄 Resetear Cooldown Ahora": Reinicia el tiempo de espera inmediatamente.
 
 --------------------------------------------------------------------------------
-6. CÓMO FUNCIONA EN VIVO DURANTE TU STREAM
+6. CÓMO FUNCIONA EN VIVO DURANTE TU STREAM (100% LIMPIO Y SIN SPAM)
 --------------------------------------------------------------------------------
 Flujo automático:
-1. Un espectador escribe en tu chat !ruleta (o canjea la ruleta en tu tienda de BotRix).
-2. El bot detecta el mensaje y la ruleta aparece en pantalla en OBS girando durante 15s.
-3. A los 14.5s la ruleta se detiene de golpe en el premio obtenido.
-4. A los 16s exactos, tu bot envía automáticamente al chat el comando de pago:
+1. Un espectador escribe en tu chat !spin (o !ruleta).
+2. El bot detecta el comando e INMEDIATAMENTE lanza la ruleta visual en tu OBS
+   sin enviar ningún texto ni comando invasivo al chat.
+3. La ruleta gira en tu pantalla durante 15s con sonidos y efectos del tema activo.
+4. Al detenerse en el premio obtenido, el bot envía al chat el comando oficial de pago:
    ej: !points add Pepe 500
-5. La ruleta se desvanece suavemente a los 21s y queda invisible hasta la próxima tirada.
-6. Cuenta regresiva automática para mayor emoción:
-   Cuando el tiempo de cooldown esté a punto de finalizar, el streamer/bot enviará automáticamente al chat:
-   - ⏳ ¡La ruleta estará disponible en 3...
-   - ⏳ ¡La ruleta estará disponible en 2...
-   - ⏳ ¡La ruleta estará disponible en 1...
-   - 🚨 ¡¡¡¡¡RULETA YA DISPONIBLE!!!!! Escribe !ruleta para girar 🎰✨
+5. ¡Listo! El ganador recibe sus puntos y la ruleta se oculta hasta la próxima tirada.
+6. Cero spam: El chat se mantiene completamente limpio. Si deseas avisos de cuenta
+   regresiva (3, 2, 1...), puedes activarlos opcionalmente desde el panel.
+7. Persistencia Total: Al guardar tu canal y token, los datos quedan almacenados
+   permanentemente en casino_config.json y en el navegador. Aunque reinicies o apagues
+   tu PC, todo estará conectado y listo al abrir casino.exe.
 
 --------------------------------------------------------------------------------
 7. DESPLIEGUE EN LA NUBE (CUALQUIER PLATAFORMA / HOSTING)

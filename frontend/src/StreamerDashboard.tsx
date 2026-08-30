@@ -10,24 +10,42 @@ export interface TwitchStatusPayload {
   isSpinActive: boolean;
   cooldownSeconds: number;
   pointsCommand?: string;
+  theme?: SlotTheme;
+  announceCountdown?: boolean;
   isConfigured?: boolean;
 }
+
+const LOCAL_STORAGE_KEY = 'casino_streamer_config_v1';
 
 export const StreamerDashboard: React.FC = () => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [twitchStatus, setTwitchStatus] = useState<TwitchStatusPayload | null>(null);
 
-  // Formulario .env
-  const [channel, setChannel] = useState<string>('Rudzy_tv');
-  const [botUsername, setBotUsername] = useState<string>('Rudzy_tv');
-  const [oauthToken, setOauthToken] = useState<string>('');
-  const [showToken, setShowToken] = useState<boolean>(false);
-  const [commandType, setCommandType] = useState<string>('botrix');
-  const [customCommand, setCustomCommand] = useState<string>('!points add {user} {prize}');
-  const [cooldownSeconds, setCooldownSeconds] = useState<number>(300);
+  // Helper para leer del localStorage inmediatamente
+  const getStoredConfig = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      }
+    } catch {}
+    return null;
+  };
 
-  // Tema de la máquina
-  const [selectedTheme, setSelectedTheme] = useState<SlotTheme>('carnival-green');
+  const stored = getStoredConfig();
+
+  // Formulario de configuración (iniciado con lo guardado en el navegador)
+  const [channel, setChannel] = useState<string>(stored?.channel || 'Rudzy_tv');
+  const [botUsername, setBotUsername] = useState<string>(stored?.botUsername || 'Rudzy_tv');
+  const [oauthToken, setOauthToken] = useState<string>(stored?.oauthToken || '');
+  const [showToken, setShowToken] = useState<boolean>(false);
+  const [commandType, setCommandType] = useState<string>(stored?.commandType || 'botrix');
+  const [customCommand, setCustomCommand] = useState<string>(stored?.customCommand || '!points add {user} {prize}');
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(stored?.cooldownSeconds ?? 300);
+
+  // Tema de la máquina y aviso de cuenta regresiva
+  const [selectedTheme, setSelectedTheme] = useState<SlotTheme>(stored?.selectedTheme || 'carnival-green');
+  const [announceCountdown, setAnnounceCountdown] = useState<boolean>(stored?.announceCountdown ?? false);
 
   // Estado de mensajes y copiado
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error' | 'info' | ''; message: string }>({
@@ -37,6 +55,18 @@ export const StreamerDashboard: React.FC = () => {
   const [copiedObsUrl, setCopiedObsUrl] = useState<boolean>(false);
 
   const socketRef = useRef<Socket | null>(null);
+
+  // Helper para guardar datos en localStorage de manera persistente
+  const saveToStorage = (updatedFields: Record<string, any>) => {
+    try {
+      if (typeof window !== 'undefined') {
+        const currentRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const current = currentRaw ? JSON.parse(currentRaw) : {};
+        const merged = { ...current, ...updatedFields };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+      }
+    } catch {}
+  };
 
   // Determinar URL del backend WebSocket
   const getBackendUrl = () => {
@@ -82,6 +112,13 @@ export const StreamerDashboard: React.FC = () => {
       if (status.cooldownSeconds !== undefined) {
         setCooldownSeconds(status.cooldownSeconds);
       }
+      if (status.theme) {
+        setSelectedTheme(status.theme);
+      }
+      if (status.announceCountdown !== undefined) {
+        setAnnounceCountdown(status.announceCountdown);
+      }
+
       if (status.pointsCommand) {
         if (status.pointsCommand.startsWith('!points add')) {
           setCommandType('botrix');
@@ -92,6 +129,30 @@ export const StreamerDashboard: React.FC = () => {
           setCustomCommand(status.pointsCommand);
         }
       }
+
+      // Sincronizar en localStorage lo que el backend confirmó
+      saveToStorage({
+        channel: status.channel,
+        botUsername: status.botUsername,
+        oauthToken: status.oauthToken,
+        cooldownSeconds: status.cooldownSeconds,
+        selectedTheme: status.theme,
+        announceCountdown: status.announceCountdown,
+      });
+
+      // Si el backend viene sin token pero localStorage tiene credenciales guardadas, restaurar automáticamente
+      const storedData = getStoredConfig();
+      if (storedData?.oauthToken && (!status.oauthToken || !status.isAuthenticated)) {
+        s.emit('set-twitch-credentials', {
+          channel: storedData.channel || status.channel || 'Rudzy_tv',
+          botUsername: storedData.botUsername || status.botUsername || 'Rudzy_tv',
+          oauthToken: storedData.oauthToken,
+          pointsCommand: storedData.customCommand || status.pointsCommand || '!points add {user} {prize}',
+          cooldownSeconds: storedData.cooldownSeconds ?? status.cooldownSeconds ?? 300,
+          theme: storedData.selectedTheme || status.theme || 'carnival-green',
+          announceCountdown: storedData.announceCountdown ?? false,
+        });
+      }
     });
 
     return () => {
@@ -99,7 +160,7 @@ export const StreamerDashboard: React.FC = () => {
     };
   }, []);
 
-  // Guardar configuración (.env)
+  // Guardar configuración (.env y casino_config.json)
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!socketRef.current) return;
@@ -122,9 +183,21 @@ export const StreamerDashboard: React.FC = () => {
       finalCommand = customCommand.trim() || '!points add {user} {prize}';
     }
 
+    // Guardar inmediatamente en localStorage
+    saveToStorage({
+      channel: cleanChannel,
+      botUsername: botUsername.trim() || cleanChannel,
+      oauthToken: oauthToken.trim(),
+      commandType,
+      customCommand: finalCommand,
+      cooldownSeconds: Number(cooldownSeconds) || 300,
+      selectedTheme,
+      announceCountdown,
+    });
+
     setSaveStatus({
       type: 'info',
-      message: 'Guardando configuración en .env y conectando a Twitch...',
+      message: 'Guardando configuración permanentemente y conectando a Twitch...',
     });
 
     socketRef.current.emit(
@@ -135,12 +208,14 @@ export const StreamerDashboard: React.FC = () => {
         oauthToken: oauthToken.trim(),
         pointsCommand: finalCommand,
         cooldownSeconds: Number(cooldownSeconds) || 300,
+        theme: selectedTheme,
+        announceCountdown,
       },
       (res: { success: boolean; message: string }) => {
         if (res?.success) {
           setSaveStatus({
             type: 'success',
-            message: res.message || '¡Datos guardados en .env y conexión establecida con éxito!',
+            message: res.message || '¡Datos guardados con persistencia total y conexión establecida!',
           });
           setTimeout(() => setSaveStatus({ type: '', message: '' }), 4000);
         } else {
@@ -157,6 +232,8 @@ export const StreamerDashboard: React.FC = () => {
   const handleUpdateCooldown = (newSeconds: number) => {
     const val = Math.max(0, Math.round(newSeconds));
     setCooldownSeconds(val);
+    saveToStorage({ cooldownSeconds: val });
+
     if (!socketRef.current) return;
 
     socketRef.current.emit(
@@ -179,6 +256,26 @@ export const StreamerDashboard: React.FC = () => {
     );
   };
 
+  // Seleccionar tema y guardarlo de inmediato
+  const handleSelectTheme = (newTheme: SlotTheme) => {
+    setSelectedTheme(newTheme);
+    saveToStorage({ selectedTheme: newTheme });
+
+    if (socketRef.current) {
+      socketRef.current.emit('set-theme', { theme: newTheme });
+    }
+  };
+
+  // Activar o desactivar cuenta regresiva en el chat
+  const handleToggleCountdown = (enabled: boolean) => {
+    setAnnounceCountdown(enabled);
+    saveToStorage({ announceCountdown: enabled });
+
+    if (socketRef.current) {
+      socketRef.current.emit('set-countdown-announcement', { enabled });
+    }
+  };
+
   // Disparar prueba de ruleta
   const handleTriggerTest = (prize = 500, user = 'ViewerPrueba') => {
     if (!socketRef.current) return;
@@ -194,7 +291,7 @@ export const StreamerDashboard: React.FC = () => {
     socketRef.current.emit('reset-cooldown', {}, () => {
       setSaveStatus({
         type: 'success',
-        message: '🔄 Cooldown reiniciado. ¡La ruleta puede jugarse de inmediato!',
+        message: '🔄 Cooldown reiniciado. ¡La ruleta puede jugarse de inmediato con !spin!',
       });
       setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
     });
@@ -222,187 +319,174 @@ export const StreamerDashboard: React.FC = () => {
     setTimeout(() => setCopiedObsUrl(false), 3000);
   };
 
-  const handleOpenOverlayTab = () => {
-    window.open(obsUrlString, '_blank');
-  };
+  const isAuth = twitchStatus?.isAuthenticated;
+  const isSpinning = twitchStatus?.isSpinActive;
 
   return (
-    <div className="dashboard-container">
-      {/* HEADER SUPERIOR */}
+    <div className="streamer-dashboard-container">
+      {/* Barra de cabecera */}
       <header className="dashboard-header">
         <div className="header-left">
-          <div className="brand-logo">
-            <span className="logo-icon">🎪</span>
-            <div className="brand-titles">
-              <h1>RUDZY FEST - RULETA TWITCH</h1>
-              <span className="brand-subtitle">Launcher & Panel de Control para Streamers</span>
-            </div>
+          <span className="brand-badge">🎰</span>
+          <div className="brand-titles">
+            <h1>RUDZY FEST - RULETA TWITCH</h1>
+            <span className="brand-subtitle">Panel de Control & Configuración OBS</span>
           </div>
         </div>
 
         <div className="header-right">
-          {/* Badge de conexión de Twitch */}
-          <div className={`connection-badge ${isConnected ? 'connected' : 'disconnected'}`}>
-            <span className="pulse-indicator" />
-            <span className="badge-text">
-              {isConnected
-                ? twitchStatus?.isAuthenticated
-                  ? `CONECTADO A #${twitchStatus.channel.toUpperCase()} (MODO PAGO ACTIVO)`
-                  : twitchStatus?.channel
-                  ? `MODO LECTURA (#${twitchStatus.channel})`
-                  : 'ESPERANDO CANAL'
-                : 'DESCONECTADO DEL SERVIDOR'}
+          <div className={`status-pill ${isConnected ? 'online' : 'offline'}`}>
+            <span className="status-dot" />
+            <span className="status-text">
+              {isConnected ? 'Servidor Conectado' : 'Conectando al Servidor...'}
             </span>
           </div>
 
-          {/* Botón Abrir Overlay en ventana aparte */}
-          <button
-            type="button"
-            className="btn-open-overlay"
-            onClick={handleOpenOverlayTab}
-            title="Abre la URL limpia del slot en una pestaña o ventana independiente"
-          >
-            🔗 Abrir Overlay en Ventana Aparte
-          </button>
-
-          {/* Botón copiar OBS */}
-          <button
-            type="button"
-            className={`btn-copy-obs ${copiedObsUrl ? 'copied' : ''}`}
-            onClick={handleCopyObsUrl}
-          >
-            {copiedObsUrl ? '✅ ¡URL Copiada!' : '📋 Copiar URL para OBS'}
-          </button>
+          <div className={`status-pill ${isAuth ? 'twitch-online' : 'twitch-offline'}`}>
+            <span className="status-dot" />
+            <span className="status-text">
+              {twitchStatus?.channel
+                ? isAuth
+                  ? `Canal: #${twitchStatus.channel} (Autenticado)`
+                  : `Canal: #${twitchStatus.channel} (Sólo Lectura)`
+                : 'Twitch: Desconectado'}
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL EN CUADRÍCULA DIRECTA */}
-      <main className="dashboard-main dashboard-grid-main">
+      {/* Banner de alerta de estado de la tirada */}
+      {isSpinning && (
+        <div className="banner-spinning">
+          <span className="spin-pulse" />
+          <span>¡RULETA GIRANDO EN OBS EN ESTE MOMENTO!</span>
+        </div>
+      )}
+
+      {/* Alerta de guardado */}
+      {saveStatus.message && (
+        <div className={`save-status-toast ${saveStatus.type}`}>
+          {saveStatus.message}
+        </div>
+      )}
+
+      {/* Contenido principal */}
+      <main className="dashboard-main-content">
         {/* =========================================================================
-            COLUMNA IZQUIERDA: CONFIGURACIÓN DE PARÁMETROS .ENV
+            COLUMNA IZQUIERDA: CONFIGURACIÓN (.ENV)
             ========================================================================= */}
-        <section className="dashboard-col col-config">
-          <div className="dash-card card-twitch-config">
+        <section className="column-config">
+          <div className="dash-card card-credentials">
             <div className="card-header">
-              <div className="card-icon twitch-icon">⚙️</div>
-              <div>
-                <h2>Configurar Canal de Twitch (.env)</h2>
-                <p>Ingresa tus atributos aquí. Se guardan en tu archivo .env automáticamente.</p>
-              </div>
+              <h2>⚙️ Configuración de Twitch</h2>
+              <p className="card-desc">
+                Configura tu canal para que la ruleta reconozca a tus espectadores y entregue puntos. Se guarda de forma permanente aunque apagues el PC.
+              </p>
             </div>
 
-            <form onSubmit={handleSave} className="dash-form">
+            <form onSubmit={handleSave} className="credentials-form">
               {/* TWITCH_CHANNEL */}
-              <div className="form-field">
-                <div className="field-label-row">
-                  <label htmlFor="cfg-channel">
-                    <code>TWITCH_CHANNEL</code> <span className="req">*</span>
-                  </label>
-                  <span className="field-desc-tag">Canal donde transmites</span>
-                </div>
-                <div className="input-with-prefix">
+              <div className="form-group">
+                <label htmlFor="twitch-channel">
+                  Canal de Twitch (TWITCH_CHANNEL):
+                  <span className="label-required">*</span>
+                </label>
+                <div className="input-prefix-wrapper">
                   <span className="input-prefix">twitch.tv/</span>
                   <input
-                    id="cfg-channel"
+                    id="twitch-channel"
                     type="text"
+                    placeholder="TuNombreDeCanal"
                     value={channel}
                     onChange={(e) => setChannel(e.target.value)}
-                    placeholder="ej: Rudzy_tv"
                     required
+                    className="form-input"
                   />
                 </div>
-                <small className="field-hint">
-                  El nombre de usuario de Twitch del canal donde se leerá el comando <code>!ruleta</code>.
-                </small>
+                <span className="input-help">
+                  Es el canal donde se activará la ruleta con el comando <code>!spin</code> (o <code>!ruleta</code>).
+                </span>
               </div>
 
               {/* TWITCH_BOT_USERNAME */}
-              <div className="form-field">
-                <div className="field-label-row">
-                  <label htmlFor="cfg-bot">
-                    <code>TWITCH_BOT_USERNAME</code> <span className="opt">(Opcional)</span>
-                  </label>
-                  <span className="field-desc-tag">Cuenta que enviará los puntos</span>
-                </div>
-                <div className="input-with-prefix">
+              <div className="form-group">
+                <label htmlFor="bot-username">
+                  Usuario del Bot / Streamer (TWITCH_BOT_USERNAME):
+                </label>
+                <div className="input-prefix-wrapper">
                   <span className="input-prefix">@</span>
                   <input
-                    id="cfg-bot"
+                    id="bot-username"
                     type="text"
+                    placeholder="TuCanal (o bot autorizado)"
                     value={botUsername}
                     onChange={(e) => setBotUsername(e.target.value)}
-                    placeholder={channel || 'ej: Rudzy_tv'}
+                    className="form-input"
                   />
                 </div>
-                <small className="field-hint">
-                  Si usas tu misma cuenta para pagar en el chat, pon el mismo usuario que en TWITCH_CHANNEL.
-                </small>
+                <span className="input-help">
+                  Cuenta desde la que se enviará el comando de recompensa al ganador.
+                </span>
               </div>
 
               {/* TWITCH_OAUTH_TOKEN */}
-              <div className="form-field token-field-highlight">
-                <div className="token-label-row">
-                  <label htmlFor="cfg-token">
-                    <code>TWITCH_OAUTH_TOKEN</code> <span className="req">*</span>
-                  </label>
-
-                  {/* BOTÓN DIRECTO ENCONTRAR MI TOKEN */}
-                  <a
-                    href="https://twitchtokengenerator.com/quick/chat:read+chat:edit"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-find-my-token"
-                    title="Abre la página oficial de Twitch para autorizar y obtener tu token en 10 segundos"
-                  >
-                    👉 Encontrar mi token
-                  </a>
-                </div>
-
-                <div className="input-with-action">
+              <div className="form-group">
+                <label htmlFor="oauth-token">
+                  Token OAuth de Twitch (TWITCH_OAUTH_TOKEN):
+                </label>
+                <div className="input-password-wrapper">
                   <input
-                    id="cfg-token"
+                    id="oauth-token"
                     type={showToken ? 'text' : 'password'}
+                    placeholder="oauth:xxxxxxxxxxxxxxxxxxxx"
                     value={oauthToken}
                     onChange={(e) => setOauthToken(e.target.value)}
-                    placeholder="oauth:tu_token_aqui..."
+                    className="form-input"
                   />
                   <button
                     type="button"
-                    className="btn-toggle-eye"
                     onClick={() => setShowToken(!showToken)}
-                    title={showToken ? 'Ocultar contraseña' : 'Ver token'}
+                    className="btn-toggle-show"
+                    title={showToken ? 'Ocultar token' : 'Mostrar token'}
                   >
-                    {showToken ? '👁️‍🗨️' : '👁️'}
+                    {showToken ? '👁️ Ocultar' : '🔒 Ver'}
                   </button>
                 </div>
 
-                <div className="token-help-bar">
-                  <span>¿Prefieres la alternativa de TMI?</span>
+                <div className="token-helper-box">
+                  <span className="helper-title">¿Cómo encontrar tu Token OAuth en 10 segundos?</span>
+                  <p>
+                    1. Entra a la web oficial y segura de Twitch Token Generator.
+                    <br />
+                    2. Inicia sesión con la cuenta de <b>{botUsername || channel || 'tu canal'}</b>.
+                    <br />
+                    3. Copia el token que empieza por <code>oauth:...</code> y pégalo arriba.
+                  </p>
                   <a
-                    href="https://twitchapps.com/tmi/"
+                    href="https://twitchtokengenerator.com"
                     target="_blank"
-                    rel="noopener noreferrer"
-                    className="link-tmi-alt"
+                    rel="noreferrer"
+                    className="btn-open-token-gen"
                   >
-                    🔗 TwitchApps TMI
+                    🔗 Encontrar mi Token OAuth en TwitchTokenGenerator.com
                   </a>
                 </div>
               </div>
 
-              {/* Comando de Puntos */}
-              <div className="form-field">
-                <label>Formato del comando para pagar puntos en el chat:</label>
-                <div className="radio-cards-group">
+              {/* POINTS_COMMAND */}
+              <div className="form-group">
+                <label>Comando para Entregar Puntos al Ganador:</label>
+                <div className="radio-options">
                   <label className={`radio-card ${commandType === 'botrix' ? 'selected' : ''}`}>
                     <input
                       type="radio"
-                      name="cmdType"
+                      name="cmd-type"
                       value="botrix"
                       checked={commandType === 'botrix'}
                       onChange={() => setCommandType('botrix')}
                     />
-                    <div className="radio-card-body">
-                      <span className="radio-title">BotRix / StreamElements</span>
+                    <div className="radio-content">
+                      <strong>BotRix / StreamElements</strong>
                       <code>!points add &#123;user&#125; &#123;prize&#125;</code>
                     </div>
                   </label>
@@ -410,13 +494,13 @@ export const StreamerDashboard: React.FC = () => {
                   <label className={`radio-card ${commandType === 'short' ? 'selected' : ''}`}>
                     <input
                       type="radio"
-                      name="cmdType"
+                      name="cmd-type"
                       value="short"
                       checked={commandType === 'short'}
                       onChange={() => setCommandType('short')}
                     />
-                    <div className="radio-card-body">
-                      <span className="radio-title">Comando Corto</span>
+                    <div className="radio-content">
+                      <strong>Comando Corto (!p)</strong>
                       <code>!p @&#123;user&#125; &#123;prize&#125;</code>
                     </div>
                   </label>
@@ -424,159 +508,160 @@ export const StreamerDashboard: React.FC = () => {
                   <label className={`radio-card ${commandType === 'custom' ? 'selected' : ''}`}>
                     <input
                       type="radio"
-                      name="cmdType"
+                      name="cmd-type"
                       value="custom"
                       checked={commandType === 'custom'}
                       onChange={() => setCommandType('custom')}
                     />
-                    <div className="radio-card-body">
-                      <span className="radio-title">Personalizado</span>
-                      <span className="radio-sub">Personalizar sintaxis</span>
+                    <div className="radio-content">
+                      <strong>Personalizado</strong>
+                      <span>Define tu propio comando</span>
                     </div>
                   </label>
                 </div>
 
                 {commandType === 'custom' && (
-                  <div className="custom-cmd-input-wrap">
+                  <div className="custom-cmd-input">
                     <input
                       type="text"
+                      placeholder="Ej: !addpoints {user} {prize}"
                       value={customCommand}
                       onChange={(e) => setCustomCommand(e.target.value)}
-                      placeholder="!givepoints {user} {prize}"
+                      className="form-input"
                     />
+                    <span className="input-help">
+                      Usa <code>&#123;user&#125;</code> para el nombre del ganador y <code>&#123;prize&#125;</code> para la cantidad de puntos.
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Feedback de guardado */}
-              {saveStatus.message && (
-                <div className={`dash-alert ${saveStatus.type}`}>
-                  {saveStatus.type === 'success' && '✅ '}
-                  {saveStatus.type === 'error' && '❌ '}
-                  {saveStatus.type === 'info' && '⏳ '}
-                  {saveStatus.message}
-                </div>
-              )}
-
-              <button type="submit" className="btn-submit-save">
-                💾 Guardar y Aplicar Cambios (.env)
-              </button>
+              {/* Botón de Guardado */}
+              <div className="form-actions">
+                <button type="submit" className="btn-save-credentials">
+                  💾 Guardar y Aplicar Cambios
+                </button>
+              </div>
             </form>
           </div>
         </section>
 
         {/* =========================================================================
-            COLUMNA DERECHA: CONTROL DE LA MÁQUINA, TEMAS, OBS, COOLDOWN Y VISTA EN VIVO
+            COLUMNA DERECHA: OBS Y PRUEBAS EN VIVO
             ========================================================================= */}
-        <section className="dashboard-col col-preview">
-          {/* Tarjeta de Control para OBS */}
-          <div className="dash-card card-obs-bar">
-            <div className="obs-bar-top">
-              <div>
-                <span className="obs-tag-badge">🎬 ENLACE DIRECTO PARA OBS STUDIO</span>
-                <p className="obs-bar-subtitle">
-                  Fondo 100% transparente. En reposo es invisible; solo aparece la máquina cuando juegan.
-                </p>
-              </div>
-
-              <div className="obs-action-buttons">
-                <button
-                  type="button"
-                  className="btn-open-new-window"
-                  onClick={handleOpenOverlayTab}
-                  title="Abrir la tragaperras en una ventana/pestaña limpia aparte"
-                >
-                  🔗 Abrir en Ventana Aparte
-                </button>
-                <button
-                  type="button"
-                  className={`btn-hero-copy ${copiedObsUrl ? 'copied' : ''}`}
-                  onClick={handleCopyObsUrl}
-                >
-                  {copiedObsUrl ? '✅ ¡URL Copiada!' : '📋 Copiar URL para OBS'}
-                </button>
-              </div>
+        <section className="column-live">
+          {/* Card de OBS Overlay */}
+          <div className="dash-card card-obs-link">
+            <div className="obs-header">
+              <span className="obs-badge">🎬 OBS Studio</span>
+              <h3>URL para Pegar en tu OBS</h3>
             </div>
+            <p className="obs-desc">
+              Esta URL genera la ruleta transparente lista para integrarse como <b>Navegador (Browser Source)</b> en tu OBS Studio. Solo se mostrará cuando un espectador juegue con <code>!spin</code>.
+            </p>
 
-            <div className="obs-url-input-group">
+            <div className="obs-input-row">
               <input
                 type="text"
                 readOnly
                 value={obsUrlString}
-                onClick={handleCopyObsUrl}
-                className="obs-readonly-url"
-                title="Haz clic para copiar"
+                className="obs-url-input"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
               />
+              <button
+                type="button"
+                onClick={handleCopyObsUrl}
+                className={`btn-copy-obs ${copiedObsUrl ? 'copied' : ''}`}
+              >
+                {copiedObsUrl ? '✅ ¡Copiada!' : '📋 Copiar URL'}
+              </button>
+              <a
+                href={obsUrlString}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-open-obs-preview"
+                title="Abrir ruleta limpia en pestaña nueva para verificar transparencia"
+              >
+                🔗 Ver Ruleta Limpia
+              </a>
+            </div>
+
+            <div className="obs-guide-pills">
+              <span>Resolución sugerida: <b>1920 x 1080</b></span>
+              <span>•</span>
+              <span>Marcar: <b>Controlar audio vía OBS</b></span>
+              <span>•</span>
+              <span>Fondo: <b>100% Transparente</b></span>
             </div>
           </div>
 
-          {/* NUEVO: Tarjeta de Modificación y Control de Cooldown */}
-          <div className="dash-card card-cooldown-control">
-            <div className="cooldown-card-header">
-              <div className="cooldown-title-group">
-                <span className="cooldown-icon">⏱️</span>
-                <div>
-                  <h3 className="cooldown-title">Modificar Tiempo de Cooldown (Espera entre Tiradas)</h3>
-                  <p className="cooldown-desc">
-                    Elige un valor rápido o escribe los segundos que quieras. Se guarda automáticamente en tu .env:
-                  </p>
-                </div>
-              </div>
-              <span className="cooldown-active-pill">
-                Activo: <b>{cooldownSeconds}s ({Math.floor(cooldownSeconds / 60)}m {cooldownSeconds % 60}s)</b>
-              </span>
+          {/* Configuración de Cooldown */}
+          <div className="dash-card card-cooldown">
+            <div className="cooldown-header">
+              <span className="cooldown-badge">⏱️ Cooldown de Tiradas</span>
+              <h3>Tiempo de Espera entre Ruletas</h3>
             </div>
+            <p className="cooldown-desc">
+              Define cuánto tiempo debe transcurrir entre cada ruleta. Ajusta los minutos o segundos a tu gusto:
+            </p>
 
-            {/* Presets de Cooldown rápidos */}
-            <div className="cooldown-presets-grid">
+            {/* Presets rápidos */}
+            <div className="cooldown-presets">
+              <span className="presets-label">Tiempos rápidos:</span>
               <button
                 type="button"
-                className={`preset-btn ${cooldownSeconds === 10 ? 'active' : ''}`}
+                className={`btn-cd-preset ${cooldownSeconds === 10 ? 'active' : ''}`}
                 onClick={() => handleUpdateCooldown(10)}
               >
-                ⚡ 10 seg (Pruebas)
+                ⚡ 10s (Pruebas)
               </button>
               <button
                 type="button"
-                className={`preset-btn ${cooldownSeconds === 30 ? 'active' : ''}`}
+                className={`btn-cd-preset ${cooldownSeconds === 30 ? 'active' : ''}`}
                 onClick={() => handleUpdateCooldown(30)}
               >
-                ⏱️ 30 seg
+                30 seg
               </button>
               <button
                 type="button"
-                className={`preset-btn ${cooldownSeconds === 60 ? 'active' : ''}`}
+                className={`btn-cd-preset ${cooldownSeconds === 60 ? 'active' : ''}`}
                 onClick={() => handleUpdateCooldown(60)}
               >
-                ⏱️ 1 min (60s)
+                1 min
               </button>
               <button
                 type="button"
-                className={`preset-btn ${cooldownSeconds === 120 ? 'active' : ''}`}
+                className={`btn-cd-preset ${cooldownSeconds === 120 ? 'active' : ''}`}
                 onClick={() => handleUpdateCooldown(120)}
               >
-                ⏱️ 2 min (120s)
+                2 min
               </button>
               <button
                 type="button"
-                className={`preset-btn ${cooldownSeconds === 300 ? 'active' : ''}`}
+                className={`btn-cd-preset ${cooldownSeconds === 300 ? 'active' : ''}`}
                 onClick={() => handleUpdateCooldown(300)}
               >
-                ⏱️ 5 min (300s - BotRix)
+                🎯 5 min (BotRix)
               </button>
               <button
                 type="button"
-                className={`preset-btn ${cooldownSeconds === 600 ? 'active' : ''}`}
+                className={`btn-cd-preset ${cooldownSeconds === 600 ? 'active' : ''}`}
                 onClick={() => handleUpdateCooldown(600)}
               >
-                ⏱️ 10 min (600s)
+                10 min
               </button>
             </div>
 
-            {/* Fila de ajuste personalizado y reset */}
-            <div className="cooldown-custom-row">
-              <div className="cd-stepper-wrap">
-                <span className="custom-cd-label">Segundos:</span>
+            {/* Selector manual en segundos */}
+            <div className="cooldown-adjuster">
+              <div className="cooldown-current-display">
+                <span className="cd-label">Tiempo configurado:</span>
+                <span className="cd-val-highlight">
+                  {Math.floor(cooldownSeconds / 60)} min {cooldownSeconds % 60} seg ({cooldownSeconds}s)
+                </span>
+              </div>
+
+              <div className="cooldown-inputs-row">
                 <div className="cd-stepper">
                   <button
                     type="button"
@@ -612,6 +697,23 @@ export const StreamerDashboard: React.FC = () => {
                 >
                   💾 Aplicar Cooldown
                 </button>
+              </div>
+
+              {/* Checkbox para activar/desactivar avisos de cuenta regresiva en el chat */}
+              <div className="countdown-toggle-row">
+                <label className="toggle-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={announceCountdown}
+                    onChange={(e) => handleToggleCountdown(e.target.checked)}
+                  />
+                  <span className="toggle-checkbox-text">
+                    📢 Avisar cuenta regresiva en el chat de Twitch (3, 2, 1... ¡RULETA YA DISPONIBLE!)
+                  </span>
+                </label>
+                <span className="toggle-checkbox-hint">
+                  Desactivado por defecto para mantener el chat limpio y no ser invasivo.
+                </span>
               </div>
 
               <div className="cooldown-actions-group">
@@ -655,7 +757,7 @@ export const StreamerDashboard: React.FC = () => {
                   key={th.id}
                   type="button"
                   className={`theme-card-btn theme-btn-${th.id} ${selectedTheme === th.id ? 'active' : ''}`}
-                  onClick={() => setSelectedTheme(th.id)}
+                  onClick={() => handleSelectTheme(th.id)}
                 >
                   <div className="theme-badge-row">
                     <span className="theme-icon">{th.icon}</span>
@@ -676,7 +778,7 @@ export const StreamerDashboard: React.FC = () => {
           <div className="dash-card card-live-machine">
             <div className="stage-header-bar">
               <span className="stage-title">
-                🔴 Vista en Vivo de la Máquina (Se activa automáticamente con <code>!ruleta</code>)
+                🔴 Vista en Vivo de la Máquina (Se activa en tu stream con <code>!spin</code> o <code>!ruleta</code>)
               </span>
 
               <div className="stage-quick-actions">

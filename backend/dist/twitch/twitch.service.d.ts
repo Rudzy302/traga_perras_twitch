@@ -6,6 +6,8 @@ export interface TwitchConfig {
     oauthToken?: string;
     pointsCommand?: string;
     cooldownSeconds?: number;
+    theme?: string;
+    announceCountdown?: boolean;
 }
 export interface PrizeTier {
     weight: number;
@@ -20,6 +22,8 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     private currentBotUsername;
     private currentOauthToken;
     private pointsCommandPattern;
+    private currentTheme;
+    private announceCountdownInChat;
     private readonly SPIN_DURATION_MS;
     private cooldownMs;
     private readonly PRIZE_TIERS;
@@ -30,10 +34,19 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     constructor(casinoGateway: CasinoGateway);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
+    private getCandidateFilePaths;
+    saveConfigToDisk(data: {
+        channel: string;
+        botUsername: string;
+        oauthToken: string;
+        pointsCommand: string;
+        cooldownSeconds: number;
+        theme?: string;
+        announceCountdown?: boolean;
+    }): void;
+    private loadConfigFromDisk;
     private disconnectFromTwitch;
     private connectToTwitch;
-    selectWeightedJackpotPrize(): number;
-    private get PRIZES_TIERS_SAFE();
     private handleChatMessage;
     private executeSpinFlow;
     private cooldownTimers;
@@ -45,6 +58,14 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
         message: string;
     }>;
     resetCooldown(): void;
+    setTheme(theme: string): {
+        success: boolean;
+        theme: string;
+    };
+    setCountdownAnnouncement(enabled: boolean): {
+        success: boolean;
+        enabled: boolean;
+    };
     setCooldownSeconds(seconds: number): {
         success: boolean;
         message: string;
@@ -61,7 +82,10 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
         isSpinActive: boolean;
         cooldownSeconds: number;
         pointsCommand: string;
+        theme: string;
+        announceCountdown: boolean;
         isConfigured: boolean;
     };
     private sleep;
+    private selectWeightedJackpotPrize;
 }

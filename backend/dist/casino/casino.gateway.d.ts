@@ -13,6 +13,8 @@ export interface SetCredentialsPayload {
     oauthToken?: string;
     pointsCommand?: string;
     cooldownSeconds?: number;
+    theme?: string;
+    announceCountdown?: boolean;
 }
 export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     private readonly twitchService;
@@ -31,6 +33,8 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         isSpinActive: boolean;
         cooldownSeconds: number;
         pointsCommand: string;
+        theme: string;
+        announceCountdown: boolean;
         isConfigured: boolean;
     };
     handleSetCredentials(client: Socket, payload: SetCredentialsPayload): Promise<{
@@ -57,5 +61,21 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
     }): {
         success: boolean;
         message: string;
+    };
+    handleSetTheme(client: Socket, payload: {
+        theme: string;
+    }): {
+        success: boolean;
+        theme: string;
+    } | {
+        success: boolean;
+    };
+    handleSetCountdownAnnouncement(client: Socket, payload: {
+        enabled: boolean;
+    }): {
+        success: boolean;
+        enabled: boolean;
+    } | {
+        success: boolean;
     };
 }

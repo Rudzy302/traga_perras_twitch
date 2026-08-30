@@ -23,6 +23,8 @@ export interface SetCredentialsPayload {
   oauthToken?: string;
   pointsCommand?: string;
   cooldownSeconds?: number;
+  theme?: string;
+  announceCountdown?: boolean;
 }
 
 @WebSocketGateway({
@@ -147,6 +149,33 @@ export class CasinoGateway
       return result;
     }
     return { success: false, message: 'Valor de cooldown inválido' };
+  }
+
+  /**
+   * Permite cambiar el tema visual y sincronizarlo con todos los clientes y OBS
+   */
+  @SubscribeMessage('set-theme')
+  handleSetTheme(client: Socket, payload: { theme: string }) {
+    if (this.twitchService && payload?.theme) {
+      const result = this.twitchService.setTheme(payload.theme);
+      this.server.emit('theme-change', payload.theme);
+      this.server.emit('twitch-status', this.twitchService.getStatus());
+      return result;
+    }
+    return { success: false };
+  }
+
+  /**
+   * Permite activar o desactivar los avisos de cuenta regresiva en el chat
+   */
+  @SubscribeMessage('set-countdown-announcement')
+  handleSetCountdownAnnouncement(client: Socket, payload: { enabled: boolean }) {
+    if (this.twitchService && payload) {
+      const result = this.twitchService.setCountdownAnnouncement(Boolean(payload.enabled));
+      this.server.emit('twitch-status', this.twitchService.getStatus());
+      return result;
+    }
+    return { success: false };
   }
 }
 

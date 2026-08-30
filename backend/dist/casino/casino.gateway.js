@@ -86,6 +86,23 @@ let CasinoGateway = CasinoGateway_1 = class CasinoGateway {
         }
         return { success: false, message: 'Valor de cooldown inválido' };
     }
+    handleSetTheme(client, payload) {
+        if (this.twitchService && payload?.theme) {
+            const result = this.twitchService.setTheme(payload.theme);
+            this.server.emit('theme-change', payload.theme);
+            this.server.emit('twitch-status', this.twitchService.getStatus());
+            return result;
+        }
+        return { success: false };
+    }
+    handleSetCountdownAnnouncement(client, payload) {
+        if (this.twitchService && payload) {
+            const result = this.twitchService.setCountdownAnnouncement(Boolean(payload.enabled));
+            this.server.emit('twitch-status', this.twitchService.getStatus());
+            return result;
+        }
+        return { success: false };
+    }
 };
 exports.CasinoGateway = CasinoGateway;
 __decorate([
@@ -128,6 +145,18 @@ __decorate([
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
     __metadata("design:returntype", void 0)
 ], CasinoGateway.prototype, "handleSetCooldown", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('set-theme'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleSetTheme", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('set-countdown-announcement'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleSetCountdownAnnouncement", null);
 exports.CasinoGateway = CasinoGateway = CasinoGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         cors: {

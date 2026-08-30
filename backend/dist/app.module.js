@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const casino_gateway_1 = require("./casino/casino.gateway");
 const twitch_service_1 = require("./twitch/twitch.service");
+const path = require("path");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -19,6 +20,13 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
+                envFilePath: [
+                    path.resolve(process.cwd(), '.env'),
+                    path.resolve(process.cwd(), '..', '.env'),
+                    path.resolve(process.cwd(), 'backend', '.env'),
+                    path.resolve(__dirname, '..', '..', '.env'),
+                    path.resolve(__dirname, '..', '.env'),
+                ],
             }),
         ],
         providers: [casino_gateway_1.CasinoGateway, twitch_service_1.TwitchService],
