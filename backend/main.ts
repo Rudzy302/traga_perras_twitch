@@ -26,10 +26,19 @@ async function bootstrap() {
   const frontendDist = possibleDistPaths.find((p) => fs.existsSync(p));
 
   if (frontendDist) {
-    app.use(express.static(frontendDist));
+    app.use(
+      express.static(frontendDist, {
+        setHeaders: (res) => {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        },
+      }),
+    );
     // SPA fallback para rutas que no sean de Socket.io
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/socket.io')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         return res.sendFile(path.join(frontendDist, 'index.html'));
       }
       next();
