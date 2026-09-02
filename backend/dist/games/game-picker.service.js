@@ -64,6 +64,11 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         catch (err) {
             this.logger.error('Error al cargar game_picker_config.json', err);
         }
+        if (this.enabledGameIds.size === 0) {
+            const defaultIds = ['minecraft', 'roblox', 'fortnite', 'lethal-company', 'phasmophobia', 'valorant', 'gta-v', 'fall-guys'];
+            defaultIds.forEach((id) => this.enabledGameIds.add(id));
+            this.saveConfig();
+        }
     }
     saveConfig() {
         try {

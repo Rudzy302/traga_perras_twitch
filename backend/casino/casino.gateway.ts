@@ -2,6 +2,8 @@ import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -58,7 +60,10 @@ export class CasinoGateway
       client.emit('twitch-status', this.twitchService.getStatus());
     }
     if (this.gamePickerService) {
-      client.emit('game-picker-state', this.gamePickerService.getState());
+      const state = this.gamePickerService.getState();
+      client.emit('game-picker-state', state);
+      const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+      client.emit('game-picker-catalog-result', catalog);
     }
   }
 
@@ -80,7 +85,7 @@ export class CasinoGateway
    * Permite consultar el estado de conexión de Twitch desde el panel
    */
   @SubscribeMessage('get-twitch-status')
-  handleGetStatus(client: Socket) {
+  handleGetStatus(@ConnectedSocket() client?: Socket) {
     return this.twitchService.getStatus();
   }
 
@@ -88,8 +93,11 @@ export class CasinoGateway
    * Permite configurar cualquier canal y token de Twitch en caliente desde el panel web
    */
   @SubscribeMessage('set-twitch-credentials')
-  async handleSetCredentials(client: Socket, payload: SetCredentialsPayload) {
-    this.logger.log(`⚙️ Recibida nueva configuración para canal: ${payload.channel}`);
+  async handleSetCredentials(
+    @MessageBody() payload: SetCredentialsPayload,
+    @ConnectedSocket() client?: Socket,
+  ) {
+    this.logger.log(`⚙️ Recibida nueva configuración para canal: ${payload?.channel}`);
     const result = await this.twitchService.reconfigure(payload);
     this.server.emit('twitch-status', this.twitchService.getStatus());
     return result;
@@ -99,7 +107,10 @@ export class CasinoGateway
    * Permite disparar una tirada de prueba desde el panel web
    */
   @SubscribeMessage('test-spin')
-  handleTestSpin(client: Socket, payload?: { username?: string; prize?: number }) {
+  handleTestSpin(
+    @MessageBody() payload?: { username?: string; prize?: number },
+    @ConnectedSocket() client?: Socket,
+  ) {
     const user = payload?.username || 'ViewerPrueba';
     const prize = payload?.prize || 500;
     this.logger.log(`🧪 Disparando tirada de prueba para @${user} (${prize} pts)`);
@@ -116,7 +127,7 @@ export class CasinoGateway
    * Permite reiniciar el temporizador de cooldown desde el panel web
    */
   @SubscribeMessage('reset-cooldown')
-  handleResetCooldown(client: Socket) {
+  handleResetCooldown(@ConnectedSocket() client?: Socket) {
     if (this.twitchService) {
       this.twitchService.resetCooldown();
       this.server.emit('twitch-status', this.twitchService.getStatus());
@@ -137,7 +148,7 @@ export class CasinoGateway
    * Permite probar la cuenta regresiva en el chat de Twitch desde el panel
    */
   @SubscribeMessage('test-countdown')
-  async handleTestCountdown(client: Socket) {
+  async handleTestCountdown(@ConnectedSocket() client?: Socket) {
     if (this.twitchService) {
       return await this.twitchService.triggerTestCountdown();
     }
@@ -148,7 +159,10 @@ export class CasinoGateway
    * Permite modificar el tiempo de cooldown directamente desde el panel web
    */
   @SubscribeMessage('set-cooldown')
-  handleSetCooldown(client: Socket, payload: { cooldownSeconds: number }) {
+  handleSetCooldown(
+    @MessageBody() payload: { cooldownSeconds: number },
+    @ConnectedSocket() client?: Socket,
+  ) {
     if (this.twitchService && payload && payload.cooldownSeconds !== undefined) {
       const result = this.twitchService.setCooldownSeconds(Number(payload.cooldownSeconds));
       this.server.emit('twitch-status', this.twitchService.getStatus());
@@ -161,7 +175,10 @@ export class CasinoGateway
    * Permite cambiar el tema visual y sincronizarlo con todos los clientes y OBS
    */
   @SubscribeMessage('set-theme')
-  handleSetTheme(client: Socket, payload: { theme: string }) {
+  handleSetTheme(
+    @MessageBody() payload: { theme: string },
+    @ConnectedSocket() client?: Socket,
+  ) {
     if (this.twitchService && payload?.theme) {
       const result = this.twitchService.setTheme(payload.theme);
       this.server.emit('theme-change', payload.theme);
@@ -175,7 +192,10 @@ export class CasinoGateway
    * Permite activar o desactivar los avisos de cuenta regresiva en el chat
    */
   @SubscribeMessage('set-countdown-announcement')
-  handleSetCountdownAnnouncement(client: Socket, payload: { enabled: boolean }) {
+  handleSetCountdownAnnouncement(
+    @MessageBody() payload: { enabled: boolean },
+    @ConnectedSocket() client?: Socket,
+  ) {
     if (this.twitchService && payload) {
       const result = this.twitchService.setCountdownAnnouncement(Boolean(payload.enabled));
       this.server.emit('twitch-status', this.twitchService.getStatus());
@@ -188,7 +208,7 @@ export class CasinoGateway
    * Permite resetear manualmente la racha de tiradas consecutivas anti-campeo
    */
   @SubscribeMessage('reset-consecutive-spins')
-  handleResetConsecutiveSpins(client: Socket) {
+  handleResetConsecutiveSpins(@ConnectedSocket() client?: Socket) {
     if (this.twitchService) {
       this.twitchService.resetConsecutiveSpins();
       this.server.emit('twitch-status', this.twitchService.getStatus());
@@ -214,62 +234,104 @@ export class CasinoGateway
   }
 
   @SubscribeMessage('get-game-picker-state')
-  handleGetGamePickerState(client: Socket) {
-    return this.gamePickerService.getState();
+  handleGetGamePickerState(@ConnectedSocket() client?: Socket) {
+    const state = this.gamePickerService.getState();
+    if (client) {
+      client.emit('game-picker-state', state);
+    }
+    return state;
   }
 
   @SubscribeMessage('search-game-picker-catalog')
-  handleSearchGameCatalog(client: Socket, payload: { query?: string; page?: number; pageSize?: number }) {
-    return this.gamePickerService.searchCatalog(payload?.query || '', payload?.page || 1, payload?.pageSize || 10);
+  handleSearchGameCatalog(
+    @MessageBody() payload: { query?: string; page?: number; pageSize?: number },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    const q = payload && typeof payload === 'object' ? payload.query || '' : '';
+    const p = payload && typeof payload === 'object' ? payload.page || 1 : 1;
+    const ps = payload && typeof payload === 'object' ? payload.pageSize || 10 : 10;
+    const result = this.gamePickerService.searchCatalog(q, p, ps);
+    if (client) {
+      client.emit('game-picker-catalog-result', result);
+    }
+    return result;
   }
 
   @SubscribeMessage('start-game-picker-voting')
-  handleStartGamePickerVoting(client: Socket, payload: { durationSeconds: number }) {
-    this.gamePickerService.startVoting(payload?.durationSeconds || 120);
+  handleStartGamePickerVoting(
+    @MessageBody() payload: { durationSeconds?: number },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    const sec = payload && typeof payload === 'object' && payload.durationSeconds ? Number(payload.durationSeconds) : 120;
+    this.gamePickerService.startVoting(sec);
     return { success: true };
   }
 
   @SubscribeMessage('stop-game-picker-voting')
-  handleStopGamePickerVoting(client: Socket) {
+  handleStopGamePickerVoting(@ConnectedSocket() client?: Socket) {
     this.gamePickerService.stopVotingManual();
     return { success: true };
   }
 
   @SubscribeMessage('enable-game')
-  handleEnableGame(client: Socket, payload: { id: string }) {
-    const success = this.gamePickerService.enableGame(payload?.id);
+  handleEnableGame(
+    @MessageBody() payload: { id: string },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    const id = payload && typeof payload === 'object' ? payload.id : (typeof payload === 'string' ? payload : '');
+    const success = this.gamePickerService.enableGame(id);
+    const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+    this.server.emit('game-picker-catalog-result', catalog);
     return { success };
   }
 
   @SubscribeMessage('disable-game')
-  handleDisableGame(client: Socket, payload: { id: string }) {
-    const success = this.gamePickerService.disableGame(payload?.id);
+  handleDisableGame(
+    @MessageBody() payload: { id: string },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    const id = payload && typeof payload === 'object' ? payload.id : (typeof payload === 'string' ? payload : '');
+    const success = this.gamePickerService.disableGame(id);
+    const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+    this.server.emit('game-picker-catalog-result', catalog);
     return { success };
   }
 
   @SubscribeMessage('add-custom-game')
-  handleAddCustomGame(client: Socket, payload: { name: string; category?: string }) {
-    if (payload?.name) {
+  handleAddCustomGame(
+    @MessageBody() payload: { name: string; category?: string },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    if (payload && payload.name) {
       const created = this.gamePickerService.addCustomGame(payload.name, payload.category);
+      const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+      this.server.emit('game-picker-catalog-result', catalog);
       return { success: true, game: created };
     }
     return { success: false, message: 'Nombre de juego requerido' };
   }
 
   @SubscribeMessage('reset-game-won-history')
-  handleResetGameWonHistory(client: Socket) {
+  handleResetGameWonHistory(@ConnectedSocket() client?: Socket) {
     this.gamePickerService.resetPreviouslyWonGames();
+    const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+    this.server.emit('game-picker-catalog-result', catalog);
     return { success: true };
   }
 
   @SubscribeMessage('set-game-picker-theme')
-  handleSetGamePickerTheme(client: Socket, payload: { theme: string }) {
-    if (payload?.theme) {
-      this.gamePickerService.setTheme(payload.theme);
+  handleSetGamePickerTheme(
+    @MessageBody() payload: { theme: string },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    const theme = payload && typeof payload === 'object' ? payload.theme : (typeof payload === 'string' ? payload : '');
+    if (theme) {
+      this.gamePickerService.setTheme(theme);
       return { success: true };
     }
     return { success: false };
   }
 }
+
 
 

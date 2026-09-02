@@ -68,7 +68,17 @@ export const StreamerDashboard: React.FC = () => {
   const [copiedObsUrl, setCopiedObsUrl] = useState<boolean>(false);
 
   // Estado de la Selectora de Juegos
-  const [gamePickerState, setGamePickerState] = useState<GamePickerState | null>(null);
+  const [gamePickerState, setGamePickerState] = useState<GamePickerState>({
+    votingState: 'IDLE',
+    duration: 120,
+    timeRemaining: 0,
+    totalVotes: 0,
+    votedGames: [],
+    previouslyWonGames: [],
+    enabledGameIds: [],
+    winningGame: null,
+    activeTheme: 'cyber-arcade',
+  });
   const [catalogQuery, setCatalogQuery] = useState<string>('');
   const [catalogPage, setCatalogPage] = useState<number>(1);
   const [catalogData, setCatalogData] = useState<{ games: any[]; total: number; page: number; totalPages: number }>({
@@ -121,6 +131,8 @@ export const StreamerDashboard: React.FC = () => {
     s.on('connect', () => {
       setIsConnected(true);
       s.emit('get-twitch-status');
+      s.emit('get-game-picker-state');
+      s.emit('search-game-picker-catalog', { query: '', page: 1, pageSize: 10 });
 
       // Si el navegador ya tiene configuración almacenada, sincronizarla con el backend
       if (stored?.channel) {
@@ -176,7 +188,14 @@ export const StreamerDashboard: React.FC = () => {
     });
 
     s.on('game-picker-state', (state: GamePickerState) => {
-      setGamePickerState(state);
+      if (state) setGamePickerState(state);
+    });
+
+    s.on('game-picker-catalog-result', (res: { games: any[]; total: number; page: number; totalPages: number }) => {
+      if (res && Array.isArray(res.games)) {
+        setCatalogData(res);
+        setCatalogPage(res.page);
+      }
     });
 
     return () => {
@@ -190,7 +209,7 @@ export const StreamerDashboard: React.FC = () => {
       'search-game-picker-catalog',
       { query, page, pageSize: 10 },
       (res: { games: any[]; total: number; page: number; totalPages: number }) => {
-        if (res) {
+        if (res && Array.isArray(res.games)) {
           setCatalogData(res);
           setCatalogPage(res.page);
         }
@@ -201,6 +220,9 @@ export const StreamerDashboard: React.FC = () => {
   // Cargar catálogo cada vez que se entra a la pestaña de Selectora de Juegos
   useEffect(() => {
     if (activeTab === 'game-picker') {
+      if (socketRef.current) {
+        socketRef.current.emit('get-game-picker-state');
+      }
       fetchCatalog(catalogQuery, catalogPage);
     }
   }, [activeTab]);
@@ -280,6 +302,7 @@ export const StreamerDashboard: React.FC = () => {
   };
 
   const handleSetGamePickerTheme = (theme: string) => {
+    setGamePickerState((prev) => ({ ...prev, activeTheme: theme }));
     if (!socketRef.current) return;
     socketRef.current.emit('set-game-picker-theme', { theme });
   };

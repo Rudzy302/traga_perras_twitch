@@ -27,7 +27,7 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
     handleConnection(client: Socket): void;
     handleDisconnect(client: Socket): void;
     emitStartSpin(payload: StartSpinPayload): void;
-    handleGetStatus(client: Socket): {
+    handleGetStatus(client?: Socket): {
         channel: string;
         botUsername: string;
         oauthToken: string;
@@ -43,48 +43,48 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         consecutiveSpinsCount: number;
         maxConsecutiveSpins: number;
     };
-    handleSetCredentials(client: Socket, payload: SetCredentialsPayload): Promise<{
+    handleSetCredentials(payload: SetCredentialsPayload, client?: Socket): Promise<{
         success: boolean;
         message: string;
     }>;
-    handleTestSpin(client: Socket, payload?: {
+    handleTestSpin(payload?: {
         username?: string;
         prize?: number;
-    }): {
+    }, client?: Socket): {
         success: boolean;
     };
-    handleResetCooldown(client: Socket): {
+    handleResetCooldown(client?: Socket): {
         success: boolean;
         message: string;
     };
     emitTwitchStatus(status: any): void;
-    handleTestCountdown(client: Socket): Promise<{
+    handleTestCountdown(client?: Socket): Promise<{
         success: boolean;
         message: string;
     }>;
-    handleSetCooldown(client: Socket, payload: {
+    handleSetCooldown(payload: {
         cooldownSeconds: number;
-    }): {
+    }, client?: Socket): {
         success: boolean;
         message: string;
     };
-    handleSetTheme(client: Socket, payload: {
+    handleSetTheme(payload: {
         theme: string;
-    }): {
+    }, client?: Socket): {
         success: boolean;
         theme: string;
     } | {
         success: boolean;
     };
-    handleSetCountdownAnnouncement(client: Socket, payload: {
+    handleSetCountdownAnnouncement(payload: {
         enabled: boolean;
-    }): {
+    }, client?: Socket): {
         success: boolean;
         enabled: boolean;
     } | {
         success: boolean;
     };
-    handleResetConsecutiveSpins(client: Socket): {
+    handleResetConsecutiveSpins(client?: Socket): {
         success: boolean;
         message: string;
     } | {
@@ -93,12 +93,12 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
     };
     emitGamePickerState(state: any): void;
     emitGamePickerSpinStarted(payload: any): void;
-    handleGetGamePickerState(client: Socket): import("../games/game-picker.service").GamePickerState;
-    handleSearchGameCatalog(client: Socket, payload: {
+    handleGetGamePickerState(client?: Socket): import("../games/game-picker.service").GamePickerState;
+    handleSearchGameCatalog(payload: {
         query?: string;
         page?: number;
         pageSize?: number;
-    }): {
+    }, client?: Socket): {
         games: {
             isEnabled: boolean;
             hasWonToday: boolean;
@@ -114,28 +114,28 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         pageSize: number;
         totalPages: number;
     };
-    handleStartGamePickerVoting(client: Socket, payload: {
-        durationSeconds: number;
-    }): {
+    handleStartGamePickerVoting(payload: {
+        durationSeconds?: number;
+    }, client?: Socket): {
         success: boolean;
     };
-    handleStopGamePickerVoting(client: Socket): {
+    handleStopGamePickerVoting(client?: Socket): {
         success: boolean;
     };
-    handleEnableGame(client: Socket, payload: {
+    handleEnableGame(payload: {
         id: string;
-    }): {
+    }, client?: Socket): {
         success: boolean;
     };
-    handleDisableGame(client: Socket, payload: {
+    handleDisableGame(payload: {
         id: string;
-    }): {
+    }, client?: Socket): {
         success: boolean;
     };
-    handleAddCustomGame(client: Socket, payload: {
+    handleAddCustomGame(payload: {
         name: string;
         category?: string;
-    }): {
+    }, client?: Socket): {
         success: boolean;
         game: import("../games/games-database").GameEntry;
         message?: undefined;
@@ -144,12 +144,12 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         message: string;
         game?: undefined;
     };
-    handleResetGameWonHistory(client: Socket): {
+    handleResetGameWonHistory(client?: Socket): {
         success: boolean;
     };
-    handleSetGamePickerTheme(client: Socket, payload: {
+    handleSetGamePickerTheme(payload: {
         theme: string;
-    }): {
+    }, client?: Socket): {
         success: boolean;
     };
 }
