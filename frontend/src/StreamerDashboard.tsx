@@ -296,16 +296,25 @@ export const StreamerDashboard: React.FC = () => {
 
   const handleDeleteGame = (id: string, name: string) => {
     if (!socketRef.current) return;
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar "${name}" del explorador de juegos?`)) return;
-    socketRef.current.emit('delete-game-from-catalog', { id }, (res: { success: boolean }) => {
-      if (res?.success) {
-        fetchCatalog();
-        setSaveStatus({
-          type: 'success',
-          message: `🗑️ "${name}" eliminado del catálogo.`,
-        });
-        setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente "${name}" del explorador de juegos?`)) return;
+
+    // Actualizar catálogo local de inmediato para feedback instantáneo
+    setCatalogData((prev) => ({
+      ...prev,
+      games: prev.games.filter((g) => g.id !== id),
+      total: Math.max(0, prev.total - 1),
+    }));
+
+    socketRef.current.emit('delete-game-from-catalog', { id }, () => {
+      fetchCatalog(catalogQuery, catalogPage);
+      if (socketRef.current) {
+        socketRef.current.emit('get-game-picker-state');
       }
+      setSaveStatus({
+        type: 'success',
+        message: `🗑️ "${name}" eliminado permanentemente del catálogo.`,
+      });
+      setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
     });
   };
 
@@ -1561,9 +1570,17 @@ export const StreamerDashboard: React.FC = () => {
                               type="button"
                               className="btn-disable-game"
                               onClick={() => handleDisableGame(game.id)}
-                              title="Quitar juego del directo"
+                              title="Deshabilitar juego de la ruleta"
                             >
                               ✕ Quitar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-delete-game"
+                              title={`Eliminar permanentemente "${game.name}"`}
+                              onClick={() => handleDeleteGame(game.id, game.name)}
+                            >
+                              🗑️
                             </button>
                           </div>
                         </div>
