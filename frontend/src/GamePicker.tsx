@@ -57,14 +57,14 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   const [spinItems, setSpinItems] = useState<VotedGameSummary[]>([]);
   const [isSpinningLocal, setIsSpinningLocal] = useState<boolean>(false);
   const [targetOffset, setTargetOffset] = useState<number>(0);
-  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(150);
+  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(200);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
 
   const reelContainerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // Inicializar Web Audio API para ticks de sonido mecánico gamer
-  const playTickSound = (freq = 800, type: OscillatorType = 'triangle', duration = 0.035) => {
+  // Sonido mecánico puro y limpio de salto de casilla (Click seco de ruleta)
+  const playCardStepSound = () => {
     try {
       if (!audioContextRef.current) {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -77,39 +77,24 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         const ctx = audioContextRef.current;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        gain.gain.setValueAtTime(0.09, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + duration);
-      }
-    } catch (_) {}
-  };
+        const filter = ctx.createBiquadFilter();
 
-  const playWinFanfare = () => {
-    try {
-      if (!audioContextRef.current) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) audioContextRef.current = new AudioCtx();
-      }
-      if (audioContextRef.current) {
-        const ctx = audioContextRef.current;
-        const notes = [440, 554.37, 659.25, 880];
-        notes.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
-          gain.gain.setValueAtTime(0.12, ctx.currentTime + idx * 0.1);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.1 + 0.5);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + idx * 0.1);
-          osc.stop(ctx.currentTime + idx * 0.1 + 0.5);
-        });
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1400, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.016);
+
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(450, ctx.currentTime);
+
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.016);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.016);
       }
     } catch (_) {}
   };
@@ -127,7 +112,6 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       setPickerState(state);
       if (state.votingState === 'WINNER') {
         setShowConfetti(true);
-        playWinFanfare();
       } else if (state.votingState === 'IDLE') {
         setShowConfetti(false);
         setIsSpinningLocal(false);
@@ -138,14 +122,14 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       setIsSpinningLocal(true);
       setShowConfetti(false);
 
-      // Generar una cinta ultra-larga con alta aleatoriedad (180 tarjetas) para dar una rotación potente y veloz
+      // Generar una cinta ultra-larga (240 tarjetas) para dar una rotación intensa y prolongada de 15 segundos
       const pool = payload.votedPool && payload.votedPool.length > 0
         ? payload.votedPool
         : [{ id: 'default', name: 'Juego Sorpresa', category: 'Aleatorio', votesCount: 1, voters: [] }];
       const winningGame = payload.winner;
 
-      const totalCards = 180;
-      const targetWinner = 150;
+      const totalCards = 240;
+      const targetWinner = 200;
       setWinnerCardIndex(targetWinner);
 
       const repeatedList: VotedGameSummary[] = [];
@@ -180,9 +164,9 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         setTargetOffset(finalOffset);
       }, 50);
 
-      // FÍSICA DE SONIDO: Desaceleración realista de ticks mecánicos a lo largo de los 10 segundos
+      // FÍSICA DE SONIDO: Desaceleración realista de salto de casilla a lo largo de 15 segundos
       const startTime = Date.now();
-      const totalDuration = 10000;
+      const totalDuration = payload.durationMs || 15000;
 
       const scheduleNextTick = () => {
         const elapsed = Date.now() - startTime;
@@ -190,20 +174,18 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
 
         const progress = elapsed / totalDuration; // 0.0 -> 1.0
 
-        // Frecuencia acústica desciende con la pérdida de inercia (de 920Hz a 480Hz)
-        const currentFreq = 920 - progress * 440;
-        playTickSound(currentFreq, 'square', 0.025);
+        playCardStepSound();
 
-        // Desaceleración progresiva de los clics:
+        // Desaceleración progresiva de los saltos de casilla:
         let nextDelay = 30;
         if (progress < 0.35) {
-          nextDelay = 28 + progress * 60; // 0s - 3.5s: Híper velocidad
+          nextDelay = 25 + progress * 60; // 0s - 5.2s: Híper velocidad
         } else if (progress < 0.65) {
-          nextDelay = 50 + (progress - 0.35) * 350; // 3.5s - 6.5s: Frenada visible
+          nextDelay = 45 + (progress - 0.35) * 320; // 5.2s - 9.7s: Frenada visible
         } else if (progress < 0.88) {
-          nextDelay = 160 + (progress - 0.65) * 1100; // 6.5s - 8.8s: Suspense
+          nextDelay = 145 + (progress - 0.65) * 950; // 9.7s - 13.2s: Salto de casilla audible y tenso
         } else {
-          nextDelay = 410 + (progress - 0.88) * 3600; // 8.8s - 10s: Clics finales dramáticos
+          nextDelay = 360 + (progress - 0.88) * 3200; // 13.2s - 15s: Últimos saltos hasta el ganador
         }
 
         setTimeout(scheduleNextTick, nextDelay);
@@ -297,7 +279,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
                 className={`gp-reel-strip ${isSpinningLocal ? 'is-spinning-active' : ''}`}
                 style={{
                   transform: `translateX(-${targetOffset}px)`,
-                  transition: isSpinningLocal ? 'transform 10s cubic-bezier(0.06, 0.9, 0.12, 1)' : 'none',
+                  transition: isSpinningLocal ? 'transform 15s cubic-bezier(0.04, 0.9, 0.1, 1)' : 'none',
                 }}
               >
                 {spinItems.map((item, idx) => {

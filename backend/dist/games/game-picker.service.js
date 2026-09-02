@@ -213,13 +213,13 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             category: winnerSummary.category,
             votedBy: winnerSummary.voters,
         };
-        this.logger.log(`Giro de Selectora iniciado (10 segundos). Ganador calculado: ${this.winningGame.name}`);
+        this.logger.log(`Giro de Selectora iniciado (15 segundos). Ganador calculado: ${this.winningGame.name}`);
         if (this.onSendMessageToChat) {
             this.onSendMessageToChat('🛑 ¡Cola de juegos cerrada! Girando la Selectora en pantalla...');
         }
         if (this.onBroadcastSpinStarted) {
             this.onBroadcastSpinStarted({
-                durationMs: 10000,
+                durationMs: 15000,
                 votedPool: poolToSpin,
                 winner: this.winningGame,
             });
@@ -227,7 +227,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.broadcastCurrentState();
         this.lifecycleTimer = setTimeout(() => {
             this.announceWinnerSequence();
-        }, 10000);
+        }, 15000);
     }
     announceWinnerSequence() {
         this.votingState = 'WINNER';
@@ -244,7 +244,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.broadcastCurrentState();
         this.lifecycleTimer = setTimeout(() => {
             this.shutdownSequence();
-        }, 15000);
+        }, 10000);
     }
     shutdownSequence() {
         this.logger.log('Selectora de Juegos apagada totalmente (modo silencio activo).');
