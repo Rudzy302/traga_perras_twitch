@@ -353,16 +353,16 @@ export class GamePickerService {
 
     const normInput = this.normalizeText(cleanInput);
 
-    // 3. SISTEMA ANTI-REPETICIÓN: Verificar si ya ganó hoy
-    const wonMatch = Array.from(this.previouslyWonGames).find((wonName) => this.isSimilar(wonName, cleanInput));
-    if (wonMatch) {
-      return { success: false, message: 'Juego ya ganado' };
-    }
-
-    // 4. DETECCIÓN MULTIPLATAFORMA (Roblox & Fortnite) & JUEGOS WEB / NAVEGADOR
+    // 3. DETECCIÓN JUEGOS WEB / NAVEGADOR
     if (normInput.startsWith('web') || normInput.startsWith('juegoweb') || normInput.startsWith('minijuego') || normInput.startsWith('navegador') || normInput.startsWith('io')) {
       let webName = cleanInput.replace(/^(web|juego\s*web|minijuego|navegador|io)\s*[:\-]?\s*/i, '').trim();
       if (webName.length > 0) {
+        // Verificar si ese juego web específico ya ganó hoy con anti-bypass (f0rz4k3n / forzaken)
+        if (this.isSubmodeAlreadyWon('web', webName)) {
+          this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego web "${webName}" ya ganó hoy.`);
+          return { success: false, message: 'Juego web ya ganado hoy' };
+        }
+
         this.activeVotes.set(lowerUser, {
           username: lowerUser,
           gameId: `web-${this.normalizeText(webName)}`,
@@ -376,14 +376,22 @@ export class GamePickerService {
       }
     }
 
+    // 4. DETECCIÓN MULTIPLATAFORMA (Roblox & Fortnite)
     if (normInput.startsWith('roblox') || normInput.startsWith('fortnite') || normInput.startsWith('fornite') || normInput.startsWith('roblx')) {
       const isRoblox = normInput.includes('robl');
       const baseId = isRoblox ? 'roblox' : 'fortnite';
       const baseName = isRoblox ? 'Roblox' : 'Fortnite';
 
       if (this.enabledGameIds.has(baseId)) {
-        // Extraer submodo
+        // Extraer submodo (ej: Forsaken, Box Fight, Brookhaven, Tycoon)
         let subMode = cleanInput.replace(/^(roblox|roblx|fortnite|fornite|fortnait)\s*[:\-]?\s*/i, '').trim();
+
+        // Verificar si este submodo específico ya ganó hoy con anti-bypass (ej: f0rz4k3n vs forzaken)
+        if (subMode.length > 0 && this.isSubmodeAlreadyWon(baseId, subMode)) {
+          this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El modo "${subMode}" de ${baseName} ya ganó hoy.`);
+          return { success: false, message: 'Modo ya ganado hoy' };
+        }
+
         const displayName = subMode.length > 0 ? `${baseName}: ${subMode}` : baseName;
 
         this.activeVotes.set(lowerUser, {
@@ -401,7 +409,13 @@ export class GamePickerService {
       }
     }
 
-    // 5. BÚSQUEDA CONTRA JUEGOS HABILITADOS (Directa y Fuzzy Matching)
+    // 5. SISTEMA ANTI-REPETICIÓN PARA JUEGOS ESTÁNDAR / INDIVIDUALES
+    if (this.isGameAlreadyWon(cleanInput)) {
+      this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego "${cleanInput}" ya ganó hoy.`);
+      return { success: false, message: 'Juego ya ganado hoy' };
+    }
+
+    // 6. BÚSQUEDA CONTRA JUEGOS HABILITADOS (Directa y Fuzzy Matching con Anti-Bypass)
     const enabledCatalog = this.getAllCatalogGames().filter((g) => this.enabledGameIds.has(g.id));
     let matchedGame: GameEntry | null = null;
 
@@ -418,11 +432,18 @@ export class GamePickerService {
       }
     }
 
-    // B. Coincidencia por similitud ortográfica (Fuzzy Matching > 70%)
+    // B. Coincidencia por similitud ortográfica y anti-bypass (Fuzzy Matching > 70%)
     if (!matchedGame) {
       let highestSimilarity = 0;
+      const deInput = this.deleetText(cleanInput);
       for (const game of enabledCatalog) {
-        const sim = this.calculateSimilarity(this.normalizeText(game.name), normInput);
+        const gameNorm = this.normalizeText(game.name);
+        const gameDeleet = this.deleetText(game.name);
+
+        const simNorm = this.calculateSimilarity(gameNorm, normInput);
+        const simDeleet = this.calculateSimilarity(gameDeleet, deInput);
+        const sim = Math.max(simNorm, simDeleet);
+
         if (sim > highestSimilarity && sim >= 0.70) {
           highestSimilarity = sim;
           matchedGame = game;
@@ -431,6 +452,12 @@ export class GamePickerService {
     }
 
     if (matchedGame) {
+      // Verificar si el juego encontrado ya ganó hoy
+      if (this.isGameAlreadyWon(matchedGame.name)) {
+        this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego "${matchedGame.name}" ya ganó hoy.`);
+        return { success: false, message: 'Juego ya ganado hoy' };
+      }
+
       this.activeVotes.set(lowerUser, {
         username: lowerUser,
         gameId: matchedGame.id,
@@ -441,16 +468,6 @@ export class GamePickerService {
 
       this.broadcastCurrentState();
       return { success: true };
-    }
-
-    // 6. SI EL JUEGO EXISTE EN EL CATÁLOGO PERO NO ESTÁ HABILITADO
-    const fullCatalog = this.getAllCatalogGames();
-    const catalogMatch = fullCatalog.find((g) => this.isSimilar(g.name, cleanInput));
-    if (catalogMatch) {
-      if (this.onSendMessageToChat) {
-        this.onSendMessageToChat(`@${lowerUser} Ese juego no está disponible por ahora 🚫`);
-      }
-      return { success: false, message: 'Juego no habilitado' };
     }
 
     // 7. Si no se reconoce en absoluto, ignorar silenciosamente
@@ -530,6 +547,148 @@ export class GamePickerService {
     if (this.onBroadcastState) {
       this.onBroadcastState(this.getState());
     }
+  }
+
+  private deleetText(text: string): string {
+    if (!text) return '';
+    let t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Reemplazos de leet speak / números / símbolos comunes (ej: f0rz4k3n -> forzaken)
+    const leetMap: { [key: string]: string } = {
+      '0': 'o',
+      '1': 'i',
+      '!': 'i',
+      '|': 'i',
+      '2': 'z',
+      '3': 'e',
+      '4': 'a',
+      '@': 'a',
+      '5': 's',
+      '$': 's',
+      '6': 'g',
+      '7': 't',
+      '+': 't',
+      '8': 'b',
+      '9': 'g',
+      '_': ' ',
+      '-': ' ',
+      '.': ' ',
+      '/': ' ',
+    };
+
+    let result = '';
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      result += leetMap[ch] !== undefined ? leetMap[ch] : ch;
+    }
+
+    // Normalizar fonemas similares y signos
+    result = result
+      .replace(/ph/g, 'f')
+      .replace(/c(?=[eiy])/g, 's')
+      .replace(/[ckq]/g, 'k')
+      .replace(/z/g, 's')
+      .replace(/v/g, 'b')
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Colapsar letras repetidas por fuerza bruta (ej: ffoooorrssaken -> forsaken)
+    result = result.replace(/(.)\1+/g, '$1');
+
+    return result;
+  }
+
+  private isSubmodeAlreadyWon(platform: 'roblox' | 'fortnite' | 'web', submodeInput: string): boolean {
+    const cleanSub = submodeInput.trim();
+    if (!cleanSub) {
+      return Array.from(this.previouslyWonGames).some((won) => {
+        const normWon = this.normalizeText(won);
+        return normWon === platform || normWon === `${platform} general`;
+      });
+    }
+
+    const normSub = this.normalizeText(cleanSub);
+    const deleetSub = this.deleetText(cleanSub);
+
+    for (const wonEntry of this.previouslyWonGames) {
+      let wonSub = wonEntry;
+      if (wonEntry.includes(':')) {
+        const parts = wonEntry.split(':');
+        const wonPlatform = parts[0].trim().toLowerCase();
+        if (
+          (platform === 'roblox' && wonPlatform.includes('robl')) ||
+          (platform === 'fortnite' && wonPlatform.includes('fortn')) ||
+          (platform === 'web' && wonPlatform.includes('web'))
+        ) {
+          wonSub = parts.slice(1).join(':').trim();
+        } else {
+          continue; // Ganador fue de otra plataforma distinta
+        }
+      }
+
+      const normWonSub = this.normalizeText(wonSub);
+      const deleetWonSub = this.deleetText(wonSub);
+
+      // 1. Coincidencia directa normalizada o contenida
+      if (normSub === normWonSub || normSub.includes(normWonSub) || normWonSub.includes(normSub)) {
+        return true;
+      }
+
+      // 2. Coincidencia Anti-Bypass / Deleet (ej: f0rz4k3n vs forsaken)
+      if (deleetSub === deleetWonSub || (deleetSub.length >= 3 && deleetWonSub.includes(deleetSub)) || (deleetWonSub.length >= 3 && deleetSub.includes(deleetWonSub))) {
+        return true;
+      }
+
+      // 3. Similitud Levenshtein con texto desleeteado (> 70%)
+      if (this.calculateSimilarity(deleetWonSub, deleetSub) >= 0.70) {
+        return true;
+      }
+
+      // 4. Similitud Levenshtein directa (> 72%)
+      if (this.calculateSimilarity(normWonSub, normSub) >= 0.72) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isGameAlreadyWon(gameName: string): boolean {
+    const normCand = this.normalizeText(gameName);
+    const deleetCand = this.deleetText(gameName);
+
+    for (const wonEntry of this.previouslyWonGames) {
+      // Si la entrada ganadora es una plataforma con submodo, no bloquea el nombre de la plataforma entera
+      if (wonEntry.includes(':')) {
+        const parts = wonEntry.split(':');
+        const platform = parts[0].trim().toLowerCase();
+        if (platform.includes('robl') || platform.includes('fortn') || platform.includes('web')) {
+          continue;
+        }
+      }
+
+      const normWon = this.normalizeText(wonEntry);
+      const deleetWon = this.deleetText(wonEntry);
+
+      if (normCand === normWon || normCand.includes(normWon) || normWon.includes(normCand)) {
+        return true;
+      }
+
+      if (deleetCand === deleetWon || (deleetCand.length >= 4 && deleetWon.includes(deleetCand))) {
+        return true;
+      }
+
+      if (this.calculateSimilarity(deleetWon, deleetCand) >= 0.70) {
+        return true;
+      }
+
+      if (this.calculateSimilarity(normWon, normCand) >= 0.72) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private normalizeText(text: string): string {

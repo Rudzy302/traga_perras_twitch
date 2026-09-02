@@ -1,18 +1,9 @@
 {
   "customGames": [
     {
-      "id": "custom-1788370628834",
+      "id": "custom-1788371911359",
       "name": "web",
       "category": "Multiplataforma / Sandbox",
-      "platform": "PC / Directo",
-      "keywords": [
-        "web"
-      ]
-    },
-    {
-      "id": "custom-1788369676885",
-      "name": "web",
-      "category": "Juego Web / Navegador",
       "platform": "PC / Directo",
       "keywords": [
         "web"
@@ -37,6 +28,10 @@
       ]
     }
   ],
+  "deletedGameIds": [
+    "custom-1788370628834",
+    "custom-1788369676885"
+  ],
   "enabledGameIds": [
     "hollow-knight",
     "fnaf-2",
@@ -54,8 +49,12 @@
     "left-4-dead-2",
     "dont-starve-together",
     "custom-1788364454105",
-    "undertale"
+    "undertale",
+    "custom-1788371911359"
   ],
-  "previouslyWonGames": [],
+  "previouslyWonGames": [
+    "🌐 Web: udner",
+    "brawl stars"
+  ],
   "activeTheme": "cyber-arcade"
 }

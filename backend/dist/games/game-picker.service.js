@@ -288,13 +288,13 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             return { success: false };
         }
         const normInput = this.normalizeText(cleanInput);
-        const wonMatch = Array.from(this.previouslyWonGames).find((wonName) => this.isSimilar(wonName, cleanInput));
-        if (wonMatch) {
-            return { success: false, message: 'Juego ya ganado' };
-        }
         if (normInput.startsWith('web') || normInput.startsWith('juegoweb') || normInput.startsWith('minijuego') || normInput.startsWith('navegador') || normInput.startsWith('io')) {
             let webName = cleanInput.replace(/^(web|juego\s*web|minijuego|navegador|io)\s*[:\-]?\s*/i, '').trim();
             if (webName.length > 0) {
+                if (this.isSubmodeAlreadyWon('web', webName)) {
+                    this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego web "${webName}" ya ganó hoy.`);
+                    return { success: false, message: 'Juego web ya ganado hoy' };
+                }
                 this.activeVotes.set(lowerUser, {
                     username: lowerUser,
                     gameId: `web-${this.normalizeText(webName)}`,
@@ -312,6 +312,10 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             const baseName = isRoblox ? 'Roblox' : 'Fortnite';
             if (this.enabledGameIds.has(baseId)) {
                 let subMode = cleanInput.replace(/^(roblox|roblx|fortnite|fornite|fortnait)\s*[:\-]?\s*/i, '').trim();
+                if (subMode.length > 0 && this.isSubmodeAlreadyWon(baseId, subMode)) {
+                    this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El modo "${subMode}" de ${baseName} ya ganó hoy.`);
+                    return { success: false, message: 'Modo ya ganado hoy' };
+                }
                 const displayName = subMode.length > 0 ? `${baseName}: ${subMode}` : baseName;
                 this.activeVotes.set(lowerUser, {
                     username: lowerUser,
@@ -326,6 +330,10 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             else {
                 return { success: false };
             }
+        }
+        if (this.isGameAlreadyWon(cleanInput)) {
+            this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego "${cleanInput}" ya ganó hoy.`);
+            return { success: false, message: 'Juego ya ganado hoy' };
         }
         const enabledCatalog = this.getAllCatalogGames().filter((g) => this.enabledGameIds.has(g.id));
         let matchedGame = null;
@@ -342,8 +350,13 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         }
         if (!matchedGame) {
             let highestSimilarity = 0;
+            const deInput = this.deleetText(cleanInput);
             for (const game of enabledCatalog) {
-                const sim = this.calculateSimilarity(this.normalizeText(game.name), normInput);
+                const gameNorm = this.normalizeText(game.name);
+                const gameDeleet = this.deleetText(game.name);
+                const simNorm = this.calculateSimilarity(gameNorm, normInput);
+                const simDeleet = this.calculateSimilarity(gameDeleet, deInput);
+                const sim = Math.max(simNorm, simDeleet);
                 if (sim > highestSimilarity && sim >= 0.70) {
                     highestSimilarity = sim;
                     matchedGame = game;
@@ -351,6 +364,10 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             }
         }
         if (matchedGame) {
+            if (this.isGameAlreadyWon(matchedGame.name)) {
+                this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego "${matchedGame.name}" ya ganó hoy.`);
+                return { success: false, message: 'Juego ya ganado hoy' };
+            }
             this.activeVotes.set(lowerUser, {
                 username: lowerUser,
                 gameId: matchedGame.id,
@@ -360,14 +377,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             });
             this.broadcastCurrentState();
             return { success: true };
-        }
-        const fullCatalog = this.getAllCatalogGames();
-        const catalogMatch = fullCatalog.find((g) => this.isSimilar(g.name, cleanInput));
-        if (catalogMatch) {
-            if (this.onSendMessageToChat) {
-                this.onSendMessageToChat(`@${lowerUser} Ese juego no está disponible por ahora 🚫`);
-            }
-            return { success: false, message: 'Juego no habilitado' };
         }
         return { success: false };
     }
@@ -435,6 +444,117 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         if (this.onBroadcastState) {
             this.onBroadcastState(this.getState());
         }
+    }
+    deleetText(text) {
+        if (!text)
+            return '';
+        let t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const leetMap = {
+            '0': 'o',
+            '1': 'i',
+            '!': 'i',
+            '|': 'i',
+            '2': 'z',
+            '3': 'e',
+            '4': 'a',
+            '@': 'a',
+            '5': 's',
+            '$': 's',
+            '6': 'g',
+            '7': 't',
+            '+': 't',
+            '8': 'b',
+            '9': 'g',
+            '_': ' ',
+            '-': ' ',
+            '.': ' ',
+            '/': ' ',
+        };
+        let result = '';
+        for (let i = 0; i < t.length; i++) {
+            const ch = t[i];
+            result += leetMap[ch] !== undefined ? leetMap[ch] : ch;
+        }
+        result = result
+            .replace(/ph/g, 'f')
+            .replace(/c(?=[eiy])/g, 's')
+            .replace(/[ckq]/g, 'k')
+            .replace(/z/g, 's')
+            .replace(/v/g, 'b')
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        result = result.replace(/(.)\1+/g, '$1');
+        return result;
+    }
+    isSubmodeAlreadyWon(platform, submodeInput) {
+        const cleanSub = submodeInput.trim();
+        if (!cleanSub) {
+            return Array.from(this.previouslyWonGames).some((won) => {
+                const normWon = this.normalizeText(won);
+                return normWon === platform || normWon === `${platform} general`;
+            });
+        }
+        const normSub = this.normalizeText(cleanSub);
+        const deleetSub = this.deleetText(cleanSub);
+        for (const wonEntry of this.previouslyWonGames) {
+            let wonSub = wonEntry;
+            if (wonEntry.includes(':')) {
+                const parts = wonEntry.split(':');
+                const wonPlatform = parts[0].trim().toLowerCase();
+                if ((platform === 'roblox' && wonPlatform.includes('robl')) ||
+                    (platform === 'fortnite' && wonPlatform.includes('fortn')) ||
+                    (platform === 'web' && wonPlatform.includes('web'))) {
+                    wonSub = parts.slice(1).join(':').trim();
+                }
+                else {
+                    continue;
+                }
+            }
+            const normWonSub = this.normalizeText(wonSub);
+            const deleetWonSub = this.deleetText(wonSub);
+            if (normSub === normWonSub || normSub.includes(normWonSub) || normWonSub.includes(normSub)) {
+                return true;
+            }
+            if (deleetSub === deleetWonSub || (deleetSub.length >= 3 && deleetWonSub.includes(deleetSub)) || (deleetWonSub.length >= 3 && deleetSub.includes(deleetWonSub))) {
+                return true;
+            }
+            if (this.calculateSimilarity(deleetWonSub, deleetSub) >= 0.70) {
+                return true;
+            }
+            if (this.calculateSimilarity(normWonSub, normSub) >= 0.72) {
+                return true;
+            }
+        }
+        return false;
+    }
+    isGameAlreadyWon(gameName) {
+        const normCand = this.normalizeText(gameName);
+        const deleetCand = this.deleetText(gameName);
+        for (const wonEntry of this.previouslyWonGames) {
+            if (wonEntry.includes(':')) {
+                const parts = wonEntry.split(':');
+                const platform = parts[0].trim().toLowerCase();
+                if (platform.includes('robl') || platform.includes('fortn') || platform.includes('web')) {
+                    continue;
+                }
+            }
+            const normWon = this.normalizeText(wonEntry);
+            const deleetWon = this.deleetText(wonEntry);
+            if (normCand === normWon || normCand.includes(normWon) || normWon.includes(normCand)) {
+                return true;
+            }
+            if (deleetCand === deleetWon || (deleetCand.length >= 4 && deleetWon.includes(deleetCand))) {
+                return true;
+            }
+            if (this.calculateSimilarity(deleetWon, deleetCand) >= 0.70) {
+                return true;
+            }
+            if (this.calculateSimilarity(normWon, normCand) >= 0.72) {
+                return true;
+            }
+        }
+        return false;
     }
     normalizeText(text) {
         return text

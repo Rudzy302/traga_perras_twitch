@@ -88,6 +88,9 @@ export declare class GamePickerService {
     private pickWeightedWinner;
     getState(): GamePickerState;
     private broadcastCurrentState;
+    private deleetText;
+    private isSubmodeAlreadyWon;
+    private isGameAlreadyWon;
     private normalizeText;
     private isSimilar;
     private calculateSimilarity;
