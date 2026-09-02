@@ -57,13 +57,14 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   const [spinItems, setSpinItems] = useState<VotedGameSummary[]>([]);
   const [isSpinningLocal, setIsSpinningLocal] = useState<boolean>(false);
   const [targetOffset, setTargetOffset] = useState<number>(0);
+  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(150);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
 
   const reelContainerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   // Inicializar Web Audio API para ticks de sonido mecánico gamer
-  const playTickSound = (freq = 800, type: OscillatorType = 'triangle', duration = 0.04) => {
+  const playTickSound = (freq = 800, type: OscillatorType = 'triangle', duration = 0.035) => {
     try {
       if (!audioContextRef.current) {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -78,7 +79,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         const gain = ctx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.setValueAtTime(0.09, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
         osc.connect(gain);
         gain.connect(ctx.destination);
@@ -137,21 +138,24 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       setIsSpinningLocal(true);
       setShowConfetti(false);
 
-      // Generar una cinta horizontal larga repitiendo los juegos votados y colocando al ganador en la posición exacta
-      const pool = payload.votedPool && payload.votedPool.length > 0 ? payload.votedPool : [{ id: 'default', name: 'Juego Sorpresa', category: 'Aleatorio', votesCount: 1, voters: [] }];
+      // Generar una cinta ultra-larga con alta aleatoriedad (180 tarjetas) para dar una rotación potente y veloz
+      const pool = payload.votedPool && payload.votedPool.length > 0
+        ? payload.votedPool
+        : [{ id: 'default', name: 'Juego Sorpresa', category: 'Aleatorio', votesCount: 1, voters: [] }];
       const winningGame = payload.winner;
 
-      // Crear lista repetida (60 tarjetas) para dar sensación de velocidad continua
+      const totalCards = 180;
+      const targetWinner = 150;
+      setWinnerCardIndex(targetWinner);
+
       const repeatedList: VotedGameSummary[] = [];
-      for (let i = 0; i < 60; i++) {
-        const item = pool[i % pool.length];
-        repeatedList.push(item);
+      for (let i = 0; i < totalCards; i++) {
+        const randomItem = pool[Math.floor(Math.random() * pool.length)];
+        repeatedList.push({ ...randomItem });
       }
 
-      // La tarjeta número 50 será el ganador definitivo
-      const targetWinnerIndex = 48;
       if (winningGame) {
-        repeatedList[targetWinnerIndex] = {
+        repeatedList[targetWinner] = {
           id: winningGame.id,
           name: winningGame.name,
           category: winningGame.category || 'Juego Elegido',
@@ -162,28 +166,50 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
 
       setSpinItems(repeatedList);
 
-      // Calcular el desplazamiento en píxeles (ancho de tarjeta 240px + gap 16px = 256px por item)
-      // Queremos que targetWinnerIndex quede exactamente en el centro del viewport (viewport aprox 700px, mitad ~350px)
+      // Calcular el desplazamiento en píxeles (ancho 240px + gap 16px = 256px por item)
+      // Ajuste al centro exacto del viewport
       const itemWidth = 256;
-      const finalOffset = targetWinnerIndex * itemWidth - (700 / 2 - itemWidth / 2);
+      const viewportWidth = reelContainerRef.current?.parentElement?.clientWidth || 700;
+      const finalOffset = targetWinner * itemWidth - (viewportWidth / 2 - itemWidth / 2);
 
       // Resetear posición primero
       setTargetOffset(0);
 
-      // Pequeño timeout para arrancar la animación CSS suave
+      // Timeout para iniciar el impulso cinético
       setTimeout(() => {
         setTargetOffset(finalOffset);
       }, 50);
 
-      // Sonidos de ticks mientras gira
-      let tickCount = 0;
-      const interval = setInterval(() => {
-        tickCount++;
-        playTickSound(600 + (tickCount % 5) * 60, 'square', 0.03);
-        if (tickCount > 40) {
-          clearInterval(interval);
+      // FÍSICA DE SONIDO: Desaceleración realista de ticks mecánicos a lo largo de los 10 segundos
+      const startTime = Date.now();
+      const totalDuration = 10000;
+
+      const scheduleNextTick = () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= totalDuration) return;
+
+        const progress = elapsed / totalDuration; // 0.0 -> 1.0
+
+        // Frecuencia acústica desciende con la pérdida de inercia (de 920Hz a 480Hz)
+        const currentFreq = 920 - progress * 440;
+        playTickSound(currentFreq, 'square', 0.025);
+
+        // Desaceleración progresiva de los clics:
+        let nextDelay = 30;
+        if (progress < 0.35) {
+          nextDelay = 28 + progress * 60; // 0s - 3.5s: Híper velocidad
+        } else if (progress < 0.65) {
+          nextDelay = 50 + (progress - 0.35) * 350; // 3.5s - 6.5s: Frenada visible
+        } else if (progress < 0.88) {
+          nextDelay = 160 + (progress - 0.65) * 1100; // 6.5s - 8.8s: Suspense
+        } else {
+          nextDelay = 410 + (progress - 0.88) * 3600; // 8.8s - 10s: Clics finales dramáticos
         }
-      }, 220);
+
+        setTimeout(scheduleNextTick, nextDelay);
+      };
+
+      scheduleNextTick();
     };
 
     socket.on('game-picker-state', handleStateChange);
@@ -268,25 +294,28 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
             <div className="gp-reel-track-wrapper">
               <div
                 ref={reelContainerRef}
-                className="gp-reel-strip"
+                className={`gp-reel-strip ${isSpinningLocal ? 'is-spinning-active' : ''}`}
                 style={{
                   transform: `translateX(-${targetOffset}px)`,
-                  transition: isSpinningLocal ? 'transform 10s cubic-bezier(0.12, 0.8, 0.15, 1)' : 'none',
+                  transition: isSpinningLocal ? 'transform 10s cubic-bezier(0.06, 0.9, 0.12, 1)' : 'none',
                 }}
               >
-                {spinItems.map((item, idx) => (
-                  <div key={idx} className="gp-game-card">
-                    <div className="gp-card-glow-border"></div>
-                    <div className="gp-card-icon">🎮</div>
-                    <div className="gp-card-title">{item.name}</div>
-                    <div className="gp-card-category">{item.category}</div>
-                    {item.voters && item.voters.length > 0 && item.voters[0] !== 'Ruleta Automática' && (
-                      <div className="gp-card-voter-badge">
-                        👤 Votos: {item.votesCount}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {spinItems.map((item, idx) => {
+                  const isWinnerCard = pickerState.votingState === 'WINNER' && idx === winnerCardIndex;
+                  return (
+                    <div key={idx} className={`gp-game-card ${isWinnerCard ? 'winner-card-glow' : ''}`}>
+                      <div className="gp-card-glow-border"></div>
+                      <div className="gp-card-icon">{isWinnerCard ? '🏆' : '🎮'}</div>
+                      <div className="gp-card-title">{item.name}</div>
+                      <div className="gp-card-category">{item.category}</div>
+                      {item.voters && item.voters.length > 0 && item.voters[0] !== 'Ruleta Automática' && (
+                        <div className="gp-card-voter-badge">
+                          👤 Votos: {item.votesCount}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

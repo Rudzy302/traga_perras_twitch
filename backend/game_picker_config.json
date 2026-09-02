@@ -1,17 +1,46 @@
 {
-  "customGames": [],
+  "customGames": [
+    {
+      "id": "custom-1788364454105",
+      "name": "R.E.P.O",
+      "category": "Juego Personalizado",
+      "platform": "PC / Directo",
+      "keywords": [
+        "r.e.p.o"
+      ]
+    },
+    {
+      "id": "custom-1788364208858",
+      "name": "brawl stars",
+      "category": "Juego Personalizado",
+      "platform": "PC / Directo",
+      "keywords": [
+        "brawl stars"
+      ]
+    }
+  ],
   "enabledGameIds": [
+    "hollow-knight",
+    "fnaf-2",
+    "fnaf-4",
+    "fnaf-sister-location",
     "roblox",
     "fortnite",
-    "overwatch-2",
-    "rocket-league",
-    "dota-2",
-    "counter-strike-2",
-    "league-of-legends",
-    "valorant",
-    "minecraft",
-    "hollow-knight"
+    "custom-1788364208858",
+    "gartic-phone",
+    "gta-v",
+    "fall-guys",
+    "cuphead",
+    "outlast",
+    "outlast-2",
+    "left-4-dead-2",
+    "dont-starve-together",
+    "custom-1788364454105",
+    "undertale"
   ],
-  "previouslyWonGames": [],
+  "previouslyWonGames": [
+    "Fall Guys",
+    "Hollow Knight"
+  ],
   "activeTheme": "cyber-arcade"
 }
