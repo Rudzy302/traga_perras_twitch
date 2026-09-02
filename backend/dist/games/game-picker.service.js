@@ -360,36 +360,51 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
                 return { success: true };
             }
         }
-        if (normInput.startsWith('roblox') || normInput.startsWith('fortnite') || normInput.startsWith('fornite') || normInput.startsWith('roblx')) {
-            const isRoblox = normInput.includes('robl');
-            const baseId = isRoblox ? 'roblox' : 'fortnite';
-            const baseName = isRoblox ? 'Roblox' : 'Fortnite';
-            if (this.enabledGameIds.has(baseId)) {
-                let subMode = cleanInput.replace(/^(roblox|roblx|fortnite|fornite|fortnait)\s*[:\-]?\s*/i, '').trim();
-                if (subMode.length > 0 && this.isSubmodeAlreadyWon(baseId, subMode)) {
-                    this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El modo "${subMode}" de ${baseName} ya ganó hoy.`);
-                    return { success: false, message: 'Modo ya ganado hoy' };
+        const enabledCatalog = this.getAllCatalogGames().filter((g) => this.enabledGameIds.has(g.id));
+        for (const game of enabledCatalog) {
+            if (this.isMultiplatformGame(game)) {
+                const gameNorm = this.normalizeText(game.name);
+                const gameIdNorm = this.normalizeText(game.id);
+                if (normInput === gameNorm || normInput === gameIdNorm || normInput.startsWith(gameNorm) || normInput.startsWith(gameIdNorm)) {
+                    const prefixLen = normInput.startsWith(gameNorm) ? game.name.length : game.id.length;
+                    let subMode = cleanInput.slice(prefixLen).replace(/^[\s:\-]+/, '').trim();
+                    if (subMode.length > 0) {
+                        if (this.isSubmodeAlreadyWon(game.id, subMode)) {
+                            this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El modo "${subMode}" de ${game.name} ya ganó hoy.`);
+                            return { success: false, message: 'Modo ya ganado hoy' };
+                        }
+                        this.activeVotes.set(lowerUser, {
+                            username: lowerUser,
+                            gameId: `${game.id}-${this.normalizeText(subMode)}`,
+                            gameName: `${game.name}: ${subMode}`,
+                            rawInput: cleanInput,
+                            timestamp: Date.now(),
+                        });
+                        this.broadcastCurrentState();
+                        return { success: true };
+                    }
+                    else {
+                        if (this.isSubmodeAlreadyWon(game.id, '')) {
+                            this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego base ${game.name} ya ganó hoy.`);
+                            return { success: false, message: 'Juego base ya ganado hoy' };
+                        }
+                        this.activeVotes.set(lowerUser, {
+                            username: lowerUser,
+                            gameId: game.id,
+                            gameName: game.name,
+                            rawInput: cleanInput,
+                            timestamp: Date.now(),
+                        });
+                        this.broadcastCurrentState();
+                        return { success: true };
+                    }
                 }
-                const displayName = subMode.length > 0 ? `${baseName}: ${subMode}` : baseName;
-                this.activeVotes.set(lowerUser, {
-                    username: lowerUser,
-                    gameId: `${baseId}-${this.normalizeText(subMode || 'general')}`,
-                    gameName: displayName,
-                    rawInput: cleanInput,
-                    timestamp: Date.now(),
-                });
-                this.broadcastCurrentState();
-                return { success: true };
-            }
-            else {
-                return { success: false };
             }
         }
         if (this.isGameAlreadyWon(cleanInput)) {
             this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego "${cleanInput}" ya ganó hoy.`);
             return { success: false, message: 'Juego ya ganado hoy' };
         }
-        const enabledCatalog = this.getAllCatalogGames().filter((g) => this.enabledGameIds.has(g.id));
         let matchedGame = null;
         for (const game of enabledCatalog) {
             const gameNorm = this.normalizeText(game.name);
@@ -433,6 +448,24 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             return { success: true };
         }
         return { success: false };
+    }
+    isMultiplatformGame(game) {
+        const normId = this.normalizeText(game.id);
+        const normName = this.normalizeText(game.name);
+        const normCat = this.normalizeText(game.category || '');
+        const normPlat = this.normalizeText(game.platform || '');
+        return (normId === 'roblox' ||
+            normId === 'fortnite' ||
+            normName === 'roblox' ||
+            normName === 'fortnite' ||
+            normName === 'minecraft' ||
+            normCat.includes('multiplataforma') ||
+            normCat.includes('multijuego') ||
+            normCat.includes('sandbox') ||
+            normCat.includes('navegador') ||
+            normCat.includes('web') ||
+            normPlat.includes('multiplataforma') ||
+            normPlat.includes('directo'));
     }
     getVotedSummaries() {
         const map = new Map();
@@ -541,12 +574,13 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         result = result.replace(/(.)\1+/g, '$1');
         return result;
     }
-    isSubmodeAlreadyWon(platform, submodeInput) {
+    isSubmodeAlreadyWon(gameIdOrPlatform, submodeInput) {
         const cleanSub = submodeInput.trim();
+        const normPrefix = this.normalizeText(gameIdOrPlatform);
         if (!cleanSub) {
             return Array.from(this.previouslyWonGames).some((won) => {
                 const normWon = this.normalizeText(won);
-                return normWon === platform || normWon === `${platform} general`;
+                return normWon === normPrefix || normWon === `${normPrefix} general`;
             });
         }
         const normSub = this.normalizeText(cleanSub);
@@ -555,10 +589,10 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             let wonSub = '';
             if (wonEntry.includes(':')) {
                 const parts = wonEntry.split(':');
-                const wonPlatform = parts[0].trim().toLowerCase();
-                if ((platform === 'roblox' && wonPlatform.includes('robl')) ||
-                    (platform === 'fortnite' && wonPlatform.includes('fortn')) ||
-                    (platform === 'web' && wonPlatform.includes('web'))) {
+                const wonGamePrefix = this.normalizeText(parts[0]);
+                if (wonGamePrefix === normPrefix ||
+                    normPrefix.includes(wonGamePrefix) ||
+                    wonGamePrefix.includes(normPrefix)) {
                     wonSub = parts.slice(1).join(':').trim();
                 }
                 else {

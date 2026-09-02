@@ -85,6 +85,7 @@ export declare class GamePickerService {
         success: boolean;
         message?: string;
     };
+    private isMultiplatformGame;
     private getVotedSummaries;
     private pickWeightedWinner;
     getState(): GamePickerState;

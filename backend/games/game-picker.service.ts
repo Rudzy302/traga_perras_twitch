@@ -119,7 +119,7 @@ export class GamePickerService {
     for (const p of this.getCandidateFilePaths('game_picker_config.json')) {
       try {
         fs.writeFileSync(p, jsonString, 'utf8');
-      } catch {}
+      } catch { }
     }
   }
 
@@ -426,7 +426,6 @@ export class GamePickerService {
     if (normInput.startsWith('web') || normInput.startsWith('juegoweb') || normInput.startsWith('minijuego') || normInput.startsWith('navegador') || normInput.startsWith('io')) {
       let webName = cleanInput.replace(/^(web|juego\s*web|minijuego|navegador|io)\s*[:\-]?\s*/i, '').trim();
       if (webName.length > 0) {
-        // Verificar si ese juego web específico ya ganó hoy con anti-bypass (f0rz4k3n / forzaken)
         if (this.isSubmodeAlreadyWon('web', webName)) {
           this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego web "${webName}" ya ganó hoy.`);
           return { success: false, message: 'Juego web ya ganado hoy' };
@@ -445,36 +444,54 @@ export class GamePickerService {
       }
     }
 
-    // 4. DETECCIÓN MULTIPLATAFORMA (Roblox & Fortnite)
-    if (normInput.startsWith('roblox') || normInput.startsWith('fortnite') || normInput.startsWith('fornite') || normInput.startsWith('roblx')) {
-      const isRoblox = normInput.includes('robl');
-      const baseId = isRoblox ? 'roblox' : 'fortnite';
-      const baseName = isRoblox ? 'Roblox' : 'Fortnite';
+    const enabledCatalog = this.getAllCatalogGames().filter((g) => this.enabledGameIds.has(g.id));
 
-      if (this.enabledGameIds.has(baseId)) {
-        // Extraer submodo (ej: Forsaken, Box Fight, Brookhaven, Tycoon)
-        let subMode = cleanInput.replace(/^(roblox|roblx|fortnite|fornite|fortnait)\s*[:\-]?\s*/i, '').trim();
+    // 4. DETECCIÓN MULTIPLATAFORMA / SANDBOX / MULTIJUEGOS (Roblox, Fortnite, Minecraft, VRChat o Personalizados)
+    for (const game of enabledCatalog) {
+      if (this.isMultiplatformGame(game)) {
+        const gameNorm = this.normalizeText(game.name);
+        const gameIdNorm = this.normalizeText(game.id);
 
-        // Verificar si este submodo específico ya ganó hoy con anti-bypass (ej: f0rz4k3n vs forzaken)
-        if (subMode.length > 0 && this.isSubmodeAlreadyWon(baseId, subMode)) {
-          this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El modo "${subMode}" de ${baseName} ya ganó hoy.`);
-          return { success: false, message: 'Modo ya ganado hoy' };
+        if (normInput === gameNorm || normInput === gameIdNorm || normInput.startsWith(gameNorm) || normInput.startsWith(gameIdNorm)) {
+          // Extraer submodo / mapa específico
+          const prefixLen = normInput.startsWith(gameNorm) ? game.name.length : game.id.length;
+          let subMode = cleanInput.slice(prefixLen).replace(/^[\s:\-]+/, '').trim();
+
+          if (subMode.length > 0) {
+            if (this.isSubmodeAlreadyWon(game.id, subMode)) {
+              this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El modo "${subMode}" de ${game.name} ya ganó hoy.`);
+              return { success: false, message: 'Modo ya ganado hoy' };
+            }
+
+            this.activeVotes.set(lowerUser, {
+              username: lowerUser,
+              gameId: `${game.id}-${this.normalizeText(subMode)}`,
+              gameName: `${game.name}: ${subMode}`,
+              rawInput: cleanInput,
+              timestamp: Date.now(),
+            });
+
+            this.broadcastCurrentState();
+            return { success: true };
+          } else {
+            // Voto al juego base genérico sin submodo
+            if (this.isSubmodeAlreadyWon(game.id, '')) {
+              this.logger.log(`🚫 Voto ignorado para @${lowerUser}: El juego base ${game.name} ya ganó hoy.`);
+              return { success: false, message: 'Juego base ya ganado hoy' };
+            }
+
+            this.activeVotes.set(lowerUser, {
+              username: lowerUser,
+              gameId: game.id,
+              gameName: game.name,
+              rawInput: cleanInput,
+              timestamp: Date.now(),
+            });
+
+            this.broadcastCurrentState();
+            return { success: true };
+          }
         }
-
-        const displayName = subMode.length > 0 ? `${baseName}: ${subMode}` : baseName;
-
-        this.activeVotes.set(lowerUser, {
-          username: lowerUser,
-          gameId: `${baseId}-${this.normalizeText(subMode || 'general')}`,
-          gameName: displayName,
-          rawInput: cleanInput,
-          timestamp: Date.now(),
-        });
-
-        this.broadcastCurrentState();
-        return { success: true };
-      } else {
-        return { success: false };
       }
     }
 
@@ -484,8 +501,7 @@ export class GamePickerService {
       return { success: false, message: 'Juego ya ganado hoy' };
     }
 
-    // 6. BÚSQUEDA CONTRA JUEGOS HABILITADOS (Directa y Fuzzy Matching con Anti-Bypass)
-    const enabledCatalog = this.getAllCatalogGames().filter((g) => this.enabledGameIds.has(g.id));
+    // 6. BÚSQUEDA CONTRA JUEGOS HABILITADOS ESTÁNDAR (Directa y Fuzzy Matching con Anti-Bypass)
     let matchedGame: GameEntry | null = null;
 
     // A. Coincidencia exacta o por keywords
@@ -544,6 +560,28 @@ export class GamePickerService {
   }
 
   // --- HELPERS Y MATEMÁTICAS PONDERADAS ---
+
+  private isMultiplatformGame(game: GameEntry): boolean {
+    const normId = this.normalizeText(game.id);
+    const normName = this.normalizeText(game.name);
+    const normCat = this.normalizeText(game.category || '');
+    const normPlat = this.normalizeText(game.platform || '');
+
+    return (
+      normId === 'roblox' ||
+      normId === 'fortnite' ||
+      normName === 'roblox' ||
+      normName === 'fortnite' ||
+      normName === 'minecraft' ||
+      normCat.includes('multiplataforma') ||
+      normCat.includes('multijuego') ||
+      normCat.includes('sandbox') ||
+      normCat.includes('navegador') ||
+      normCat.includes('web') ||
+      normPlat.includes('multiplataforma') ||
+      normPlat.includes('directo')
+    );
+  }
 
   private getVotedSummaries(): VotedGameSummary[] {
     const map = new Map<string, { id: string; name: string; category: string; voters: string[] }>();
@@ -668,13 +706,15 @@ export class GamePickerService {
     return result;
   }
 
-  private isSubmodeAlreadyWon(platform: 'roblox' | 'fortnite' | 'web', submodeInput: string): boolean {
+  private isSubmodeAlreadyWon(gameIdOrPlatform: string, submodeInput: string): boolean {
     const cleanSub = submodeInput.trim();
+    const normPrefix = this.normalizeText(gameIdOrPlatform);
+
     if (!cleanSub) {
       // Si no especificó submodo (!juego roblox), verificar si ya ganó el juego base genérico
       return Array.from(this.previouslyWonGames).some((won) => {
         const normWon = this.normalizeText(won);
-        return normWon === platform || normWon === `${platform} general`;
+        return normWon === normPrefix || normWon === `${normPrefix} general`;
       });
     }
 
@@ -686,11 +726,11 @@ export class GamePickerService {
 
       if (wonEntry.includes(':')) {
         const parts = wonEntry.split(':');
-        const wonPlatform = parts[0].trim().toLowerCase();
+        const wonGamePrefix = this.normalizeText(parts[0]);
         if (
-          (platform === 'roblox' && wonPlatform.includes('robl')) ||
-          (platform === 'fortnite' && wonPlatform.includes('fortn')) ||
-          (platform === 'web' && wonPlatform.includes('web'))
+          wonGamePrefix === normPrefix ||
+          normPrefix.includes(wonGamePrefix) ||
+          wonGamePrefix.includes(normPrefix)
         ) {
           wonSub = parts.slice(1).join(':').trim();
         } else {
