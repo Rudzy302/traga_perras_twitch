@@ -32,6 +32,7 @@ export declare class GamePickerService {
     private readonly logger;
     private configPath;
     private customGames;
+    private deletedGameIds;
     private enabledGameIds;
     private previouslyWonGames;
     private activeVotes;
@@ -68,6 +69,7 @@ export declare class GamePickerService {
     enableGame(id: string): boolean;
     disableGame(id: string): boolean;
     addCustomGame(name: string, category?: string): GameEntry;
+    deleteGame(id: string): boolean;
     resetPreviouslyWonGames(): void;
     setTheme(theme: string): void;
     startVoting(durationSeconds?: number): void;

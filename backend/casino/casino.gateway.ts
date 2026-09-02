@@ -311,6 +311,18 @@ export class CasinoGateway
     return { success: false, message: 'Nombre de juego requerido' };
   }
 
+  @SubscribeMessage('delete-game-from-catalog')
+  handleDeleteGameFromCatalog(
+    @MessageBody() payload: { id: string },
+    @ConnectedSocket() client?: Socket,
+  ) {
+    const id = payload && typeof payload === 'object' ? payload.id : (typeof payload === 'string' ? payload : '');
+    const success = this.gamePickerService.deleteGame(id);
+    const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+    this.server.emit('game-picker-catalog-result', catalog);
+    return { success };
+  }
+
   @SubscribeMessage('reset-game-won-history')
   handleResetGameWonHistory(@ConnectedSocket() client?: Socket) {
     this.gamePickerService.resetPreviouslyWonGames();

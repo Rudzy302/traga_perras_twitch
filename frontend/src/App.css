@@ -5265,6 +5265,27 @@ body.overlay-mode {
   color: #ff1744;
 }
 
+.btn-delete-game {
+  background: rgba(255, 0, 85, 0.1);
+  border: 1px solid rgba(255, 0, 85, 0.35);
+  color: #ff0055;
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-delete-game:hover {
+  background: rgba(255, 0, 85, 0.3);
+  border-color: #ff0055;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+  transform: scale(1.05);
+}
+
 /* Paginación */
 .gp-pagination-controls {
   display: flex;

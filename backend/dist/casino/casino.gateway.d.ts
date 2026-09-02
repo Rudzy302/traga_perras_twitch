@@ -144,6 +144,11 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         message: string;
         game?: undefined;
     };
+    handleDeleteGameFromCatalog(payload: {
+        id: string;
+    }, client?: Socket): {
+        success: boolean;
+    };
     handleResetGameWonHistory(client?: Socket): {
         success: boolean;
     };

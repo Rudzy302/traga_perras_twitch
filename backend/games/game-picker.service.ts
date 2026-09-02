@@ -35,6 +35,7 @@ export class GamePickerService {
   private configPath = path.resolve(process.cwd(), 'game_picker_config.json');
 
   private customGames: GameEntry[] = [];
+  private deletedGameIds: Set<string> = new Set();
   private enabledGameIds: Set<string> = new Set([
     'minecraft',
     'roblox',
@@ -74,6 +75,7 @@ export class GamePickerService {
       if (fs.existsSync(this.configPath)) {
         const data = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
         if (Array.isArray(data.customGames)) this.customGames = data.customGames;
+        if (Array.isArray(data.deletedGameIds)) this.deletedGameIds = new Set(data.deletedGameIds);
         if (Array.isArray(data.enabledGameIds)) this.enabledGameIds = new Set(data.enabledGameIds);
         if (Array.isArray(data.previouslyWonGames)) this.previouslyWonGames = new Set(data.previouslyWonGames);
         if (data.activeTheme) this.activeTheme = data.activeTheme;
@@ -94,6 +96,7 @@ export class GamePickerService {
     try {
       const data = {
         customGames: this.customGames,
+        deletedGameIds: Array.from(this.deletedGameIds),
         enabledGameIds: Array.from(this.enabledGameIds),
         previouslyWonGames: Array.from(this.previouslyWonGames),
         activeTheme: this.activeTheme,
@@ -107,7 +110,7 @@ export class GamePickerService {
   // --- CATÁLOGO Y BÚSQUEDA PAGINADA (10 EN 10) ---
 
   public getAllCatalogGames(): GameEntry[] {
-    return [...this.customGames, ...GAMES_CATALOG];
+    return [...this.customGames, ...GAMES_CATALOG].filter((g) => !this.deletedGameIds.has(g.id));
   }
 
   public searchCatalog(query: string = '', page: number = 1, pageSize: number = 10) {
@@ -174,6 +177,15 @@ export class GamePickerService {
     this.saveConfig();
     this.broadcastCurrentState();
     return newGame;
+  }
+
+  public deleteGame(id: string): boolean {
+    this.customGames = this.customGames.filter((g) => g.id !== id);
+    this.deletedGameIds.add(id);
+    this.enabledGameIds.delete(id);
+    this.saveConfig();
+    this.broadcastCurrentState();
+    return true;
   }
 
   public resetPreviouslyWonGames() {

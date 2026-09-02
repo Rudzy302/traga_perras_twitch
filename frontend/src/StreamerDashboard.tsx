@@ -294,6 +294,21 @@ export const StreamerDashboard: React.FC = () => {
     });
   };
 
+  const handleDeleteGame = (id: string, name: string) => {
+    if (!socketRef.current) return;
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar "${name}" del explorador de juegos?`)) return;
+    socketRef.current.emit('delete-game-from-catalog', { id }, (res: { success: boolean }) => {
+      if (res?.success) {
+        fetchCatalog();
+        setSaveStatus({
+          type: 'success',
+          message: `🗑️ "${name}" eliminado del catálogo.`,
+        });
+        setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+      }
+    });
+  };
+
   const handleAddCustomGameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customGameName.trim()) return;
@@ -1421,6 +1436,14 @@ export const StreamerDashboard: React.FC = () => {
                                 ➕ Habilitar
                               </button>
                             )}
+                            <button
+                              type="button"
+                              className="btn-delete-game"
+                              title={`Eliminar "${game.name}"`}
+                              onClick={() => handleDeleteGame(game.id, game.name)}
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </div>
                       ))}

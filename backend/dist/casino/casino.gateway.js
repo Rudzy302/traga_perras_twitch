@@ -178,6 +178,13 @@ let CasinoGateway = CasinoGateway_1 = class CasinoGateway {
         }
         return { success: false, message: 'Nombre de juego requerido' };
     }
+    handleDeleteGameFromCatalog(payload, client) {
+        const id = payload && typeof payload === 'object' ? payload.id : (typeof payload === 'string' ? payload : '');
+        const success = this.gamePickerService.deleteGame(id);
+        const catalog = this.gamePickerService.searchCatalog('', 1, 10);
+        this.server.emit('game-picker-catalog-result', catalog);
+        return { success };
+    }
     handleResetGameWonHistory(client) {
         this.gamePickerService.resetPreviouslyWonGames();
         const catalog = this.gamePickerService.searchCatalog('', 1, 10);
@@ -320,6 +327,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, socket_io_1.Socket]),
     __metadata("design:returntype", void 0)
 ], CasinoGateway.prototype, "handleAddCustomGame", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('delete-game-from-catalog'),
+    __param(0, (0, websockets_1.MessageBody)()),
+    __param(1, (0, websockets_1.ConnectedSocket)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, socket_io_1.Socket]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleDeleteGameFromCatalog", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('reset-game-won-history'),
     __param(0, (0, websockets_1.ConnectedSocket)()),

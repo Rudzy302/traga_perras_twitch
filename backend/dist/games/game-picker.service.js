@@ -20,6 +20,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.logger = new common_1.Logger(GamePickerService_1.name);
         this.configPath = path.resolve(process.cwd(), 'game_picker_config.json');
         this.customGames = [];
+        this.deletedGameIds = new Set();
         this.enabledGameIds = new Set([
             'minecraft',
             'roblox',
@@ -52,6 +53,8 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
                 const data = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
                 if (Array.isArray(data.customGames))
                     this.customGames = data.customGames;
+                if (Array.isArray(data.deletedGameIds))
+                    this.deletedGameIds = new Set(data.deletedGameIds);
                 if (Array.isArray(data.enabledGameIds))
                     this.enabledGameIds = new Set(data.enabledGameIds);
                 if (Array.isArray(data.previouslyWonGames))
@@ -74,6 +77,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         try {
             const data = {
                 customGames: this.customGames,
+                deletedGameIds: Array.from(this.deletedGameIds),
                 enabledGameIds: Array.from(this.enabledGameIds),
                 previouslyWonGames: Array.from(this.previouslyWonGames),
                 activeTheme: this.activeTheme,
@@ -85,7 +89,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         }
     }
     getAllCatalogGames() {
-        return [...this.customGames, ...games_database_1.GAMES_CATALOG];
+        return [...this.customGames, ...games_database_1.GAMES_CATALOG].filter((g) => !this.deletedGameIds.has(g.id));
     }
     searchCatalog(query = '', page = 1, pageSize = 10) {
         const all = this.getAllCatalogGames();
@@ -146,6 +150,14 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.saveConfig();
         this.broadcastCurrentState();
         return newGame;
+    }
+    deleteGame(id) {
+        this.customGames = this.customGames.filter((g) => g.id !== id);
+        this.deletedGameIds.add(id);
+        this.enabledGameIds.delete(id);
+        this.saveConfig();
+        this.broadcastCurrentState();
+        return true;
     }
     resetPreviouslyWonGames() {
         this.previouslyWonGames.clear();
