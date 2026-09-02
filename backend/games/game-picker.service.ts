@@ -380,7 +380,7 @@ export class GamePickerService {
         return { success: true };
       } else {
         if (this.onSendMessageToChat) {
-          this.onSendMessageToChat(`@${lowerUser} ${baseName} no está disponible por ahora 🚫 (Prueba con los juegos habilitados en el directo).`);
+          this.onSendMessageToChat(`@${lowerUser} Ese juego no está disponible por ahora 🚫`);
         }
         return { success: false };
       }
@@ -433,7 +433,7 @@ export class GamePickerService {
     const catalogMatch = fullCatalog.find((g) => this.isSimilar(g.name, cleanInput));
     if (catalogMatch) {
       if (this.onSendMessageToChat) {
-        this.onSendMessageToChat(`@${lowerUser} "${catalogMatch.name}" no está disponible por ahora 🚫 (Prueba con los juegos habilitados en el directo).`);
+        this.onSendMessageToChat(`@${lowerUser} Ese juego no está disponible por ahora 🚫`);
       }
       return { success: false, message: 'Juego no habilitado' };
     }
