@@ -255,11 +255,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
 
           animFrameRef.current = requestAnimationFrame(animateWheel);
         } else {
-          // FASE DE REBOTE MAGNÉTICO AL CENTRO EXACTO
-          playNeedleTick();
-          setNeedleActive(true);
-          setTimeout(() => setNeedleActive(false), 120);
-
+          // FASE DE REBOTE MAGNÉTICO AL CENTRO EXACTO (Sin sonido en la línea central, suave y silencioso)
           if (reelContainerRef.current) {
             // Rebote elástico que clava la casilla ganadora en todo el centro
             reelContainerRef.current.style.transition = 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
