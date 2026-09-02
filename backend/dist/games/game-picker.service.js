@@ -196,8 +196,31 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.broadcastCurrentState();
         this.votingTimer = setInterval(() => {
             this.timeRemaining--;
+            if (this.onSendMessageToChat) {
+                if (this.timeRemaining === 10) {
+                    this.onSendMessageToChat('⏳ ¡Las votaciones de la selectora se cierran en 10 segundos!');
+                }
+                else if (this.timeRemaining === 5) {
+                    this.onSendMessageToChat('⏳ ¡Votaciones de la selectora se cierran en 5...');
+                }
+                else if (this.timeRemaining === 4) {
+                    this.onSendMessageToChat('⏳ 4...');
+                }
+                else if (this.timeRemaining === 3) {
+                    this.onSendMessageToChat('⏳ 3...');
+                }
+                else if (this.timeRemaining === 2) {
+                    this.onSendMessageToChat('⏳ 2...');
+                }
+                else if (this.timeRemaining === 1) {
+                    this.onSendMessageToChat('⏳ 1...');
+                }
+            }
             if (this.timeRemaining <= 0) {
                 this.clearVotingTimer();
+                if (this.onSendMessageToChat) {
+                    this.onSendMessageToChat('🛑 ¡VOTACIONES CERRADAS! Girando la selectora de juegos...');
+                }
                 this.startSpinSequence();
             }
             else {
@@ -498,7 +521,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         const normSub = this.normalizeText(cleanSub);
         const deleetSub = this.deleetText(cleanSub);
         for (const wonEntry of this.previouslyWonGames) {
-            let wonSub = wonEntry;
+            let wonSub = '';
             if (wonEntry.includes(':')) {
                 const parts = wonEntry.split(':');
                 const wonPlatform = parts[0].trim().toLowerCase();
@@ -511,18 +534,23 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
                     continue;
                 }
             }
+            else {
+                continue;
+            }
+            if (!wonSub)
+                continue;
             const normWonSub = this.normalizeText(wonSub);
             const deleetWonSub = this.deleetText(wonSub);
-            if (normSub === normWonSub || normSub.includes(normWonSub) || normWonSub.includes(normSub)) {
+            if (normSub === normWonSub || (normSub.length >= 4 && normWonSub.length >= 4 && (normSub.includes(normWonSub) || normWonSub.includes(normSub)))) {
                 return true;
             }
-            if (deleetSub === deleetWonSub || (deleetSub.length >= 3 && deleetWonSub.includes(deleetSub)) || (deleetWonSub.length >= 3 && deleetSub.includes(deleetWonSub))) {
+            if (deleetSub === deleetWonSub || (deleetSub.length >= 4 && deleetWonSub.length >= 4 && (deleetWonSub.includes(deleetSub) || deleetSub.includes(deleetWonSub)))) {
                 return true;
             }
-            if (this.calculateSimilarity(deleetWonSub, deleetSub) >= 0.70) {
+            if (this.calculateSimilarity(deleetWonSub, deleetSub) >= 0.72) {
                 return true;
             }
-            if (this.calculateSimilarity(normWonSub, normSub) >= 0.72) {
+            if (this.calculateSimilarity(normWonSub, normSub) >= 0.75) {
                 return true;
             }
         }
@@ -530,27 +558,34 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
     }
     isGameAlreadyWon(gameName) {
         const normCand = this.normalizeText(gameName);
+        if (normCand.startsWith('roblox') ||
+            normCand.startsWith('fortnite') ||
+            normCand.startsWith('fornite') ||
+            normCand.startsWith('roblx') ||
+            normCand.startsWith('web')) {
+            return false;
+        }
         const deleetCand = this.deleetText(gameName);
         for (const wonEntry of this.previouslyWonGames) {
-            if (wonEntry.includes(':')) {
-                const parts = wonEntry.split(':');
-                const platform = parts[0].trim().toLowerCase();
-                if (platform.includes('robl') || platform.includes('fortn') || platform.includes('web')) {
-                    continue;
-                }
-            }
             const normWon = this.normalizeText(wonEntry);
+            if (normWon.startsWith('roblox') ||
+                normWon.startsWith('fortnite') ||
+                normWon.startsWith('fornite') ||
+                normWon.startsWith('roblx') ||
+                normWon.startsWith('web')) {
+                continue;
+            }
             const deleetWon = this.deleetText(wonEntry);
-            if (normCand === normWon || normCand.includes(normWon) || normWon.includes(normCand)) {
+            if (normCand === normWon || (normCand.length >= 4 && normWon.length >= 4 && (normCand.includes(normWon) || normWon.includes(normCand)))) {
                 return true;
             }
-            if (deleetCand === deleetWon || (deleetCand.length >= 4 && deleetWon.includes(deleetCand))) {
+            if (deleetCand === deleetWon || (deleetCand.length >= 4 && deleetWon.length >= 4 && (deleetWon.includes(deleetCand) || deleetCand.includes(deleetWon)))) {
                 return true;
             }
-            if (this.calculateSimilarity(deleetWon, deleetCand) >= 0.70) {
+            if (this.calculateSimilarity(deleetWon, deleetCand) >= 0.72) {
                 return true;
             }
-            if (this.calculateSimilarity(normWon, normCand) >= 0.72) {
+            if (this.calculateSimilarity(normWon, normCand) >= 0.75) {
                 return true;
             }
         }

@@ -235,8 +235,28 @@ export class GamePickerService {
     this.votingTimer = setInterval(() => {
       this.timeRemaining--;
 
+      // Avisos de cuenta regresiva en el chat de Twitch (auto-borrados tras 60s)
+      if (this.onSendMessageToChat) {
+        if (this.timeRemaining === 10) {
+          this.onSendMessageToChat('⏳ ¡Las votaciones de la selectora se cierran en 10 segundos!');
+        } else if (this.timeRemaining === 5) {
+          this.onSendMessageToChat('⏳ ¡Votaciones de la selectora se cierran en 5...');
+        } else if (this.timeRemaining === 4) {
+          this.onSendMessageToChat('⏳ 4...');
+        } else if (this.timeRemaining === 3) {
+          this.onSendMessageToChat('⏳ 3...');
+        } else if (this.timeRemaining === 2) {
+          this.onSendMessageToChat('⏳ 2...');
+        } else if (this.timeRemaining === 1) {
+          this.onSendMessageToChat('⏳ 1...');
+        }
+      }
+
       if (this.timeRemaining <= 0) {
         this.clearVotingTimer();
+        if (this.onSendMessageToChat) {
+          this.onSendMessageToChat('🛑 ¡VOTACIONES CERRADAS! Girando la selectora de juegos...');
+        }
         this.startSpinSequence();
       } else {
         this.broadcastCurrentState();
@@ -602,6 +622,7 @@ export class GamePickerService {
   private isSubmodeAlreadyWon(platform: 'roblox' | 'fortnite' | 'web', submodeInput: string): boolean {
     const cleanSub = submodeInput.trim();
     if (!cleanSub) {
+      // Si no especificó submodo (!juego roblox), verificar si ya ganó el juego base genérico
       return Array.from(this.previouslyWonGames).some((won) => {
         const normWon = this.normalizeText(won);
         return normWon === platform || normWon === `${platform} general`;
@@ -612,7 +633,8 @@ export class GamePickerService {
     const deleetSub = this.deleetText(cleanSub);
 
     for (const wonEntry of this.previouslyWonGames) {
-      let wonSub = wonEntry;
+      let wonSub = '';
+
       if (wonEntry.includes(':')) {
         const parts = wonEntry.split(':');
         const wonPlatform = parts[0].trim().toLowerCase();
@@ -625,28 +647,34 @@ export class GamePickerService {
         } else {
           continue; // Ganador fue de otra plataforma distinta
         }
+      } else {
+        // Si el ganador anterior fue solo el juego base genérico (ej: "Roblox"),
+        // NO bloquea los submodos específicos como "balsas oxidadas" o "guerra de confetti".
+        continue;
       }
+
+      if (!wonSub) continue;
 
       const normWonSub = this.normalizeText(wonSub);
       const deleetWonSub = this.deleetText(wonSub);
 
-      // 1. Coincidencia directa normalizada o contenida
-      if (normSub === normWonSub || normSub.includes(normWonSub) || normWonSub.includes(normSub)) {
+      // 1. Coincidencia directa normalizada
+      if (normSub === normWonSub || (normSub.length >= 4 && normWonSub.length >= 4 && (normSub.includes(normWonSub) || normWonSub.includes(normSub)))) {
         return true;
       }
 
       // 2. Coincidencia Anti-Bypass / Deleet (ej: f0rz4k3n vs forsaken)
-      if (deleetSub === deleetWonSub || (deleetSub.length >= 3 && deleetWonSub.includes(deleetSub)) || (deleetWonSub.length >= 3 && deleetSub.includes(deleetWonSub))) {
+      if (deleetSub === deleetWonSub || (deleetSub.length >= 4 && deleetWonSub.length >= 4 && (deleetWonSub.includes(deleetSub) || deleetSub.includes(deleetWonSub)))) {
         return true;
       }
 
-      // 3. Similitud Levenshtein con texto desleeteado (> 70%)
-      if (this.calculateSimilarity(deleetWonSub, deleetSub) >= 0.70) {
+      // 3. Similitud Levenshtein con texto desleeteado (> 72%)
+      if (this.calculateSimilarity(deleetWonSub, deleetSub) >= 0.72) {
         return true;
       }
 
-      // 4. Similitud Levenshtein directa (> 72%)
-      if (this.calculateSimilarity(normWonSub, normSub) >= 0.72) {
+      // 4. Similitud Levenshtein directa (> 75%)
+      if (this.calculateSimilarity(normWonSub, normSub) >= 0.75) {
         return true;
       }
     }
@@ -656,34 +684,50 @@ export class GamePickerService {
 
   private isGameAlreadyWon(gameName: string): boolean {
     const normCand = this.normalizeText(gameName);
+
+    // Si la entrada es un comando de plataforma (roblox, fortnite, web),
+    // la validación de submodos le corresponde exclusivamente a isSubmodeAlreadyWon
+    if (
+      normCand.startsWith('roblox') ||
+      normCand.startsWith('fortnite') ||
+      normCand.startsWith('fornite') ||
+      normCand.startsWith('roblx') ||
+      normCand.startsWith('web')
+    ) {
+      return false;
+    }
+
     const deleetCand = this.deleetText(gameName);
 
     for (const wonEntry of this.previouslyWonGames) {
-      // Si la entrada ganadora es una plataforma con submodo, no bloquea el nombre de la plataforma entera
-      if (wonEntry.includes(':')) {
-        const parts = wonEntry.split(':');
-        const platform = parts[0].trim().toLowerCase();
-        if (platform.includes('robl') || platform.includes('fortn') || platform.includes('web')) {
-          continue;
-        }
+      const normWon = this.normalizeText(wonEntry);
+
+      // Si la entrada ganadora fue de una plataforma, ignorar aquí
+      if (
+        normWon.startsWith('roblox') ||
+        normWon.startsWith('fortnite') ||
+        normWon.startsWith('fornite') ||
+        normWon.startsWith('roblx') ||
+        normWon.startsWith('web')
+      ) {
+        continue;
       }
 
-      const normWon = this.normalizeText(wonEntry);
       const deleetWon = this.deleetText(wonEntry);
 
-      if (normCand === normWon || normCand.includes(normWon) || normWon.includes(normCand)) {
+      if (normCand === normWon || (normCand.length >= 4 && normWon.length >= 4 && (normCand.includes(normWon) || normWon.includes(normCand)))) {
         return true;
       }
 
-      if (deleetCand === deleetWon || (deleetCand.length >= 4 && deleetWon.includes(deleetCand))) {
+      if (deleetCand === deleetWon || (deleetCand.length >= 4 && deleetWon.length >= 4 && (deleetWon.includes(deleetCand) || deleetCand.includes(deleetWon)))) {
         return true;
       }
 
-      if (this.calculateSimilarity(deleetWon, deleetCand) >= 0.70) {
+      if (this.calculateSimilarity(deleetWon, deleetCand) >= 0.72) {
         return true;
       }
 
-      if (this.calculateSimilarity(normWon, normCand) >= 0.72) {
+      if (this.calculateSimilarity(normWon, normCand) >= 0.75) {
         return true;
       }
     }
