@@ -66,6 +66,9 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.isSpinActive = false;
         this.lastSpinTimestamp = 0;
         this.recentSpinUsers = new Map();
+        this.lastConsecutiveUser = null;
+        this.consecutiveSpinsCount = 0;
+        this.MAX_CONSECUTIVE_SPINS = 2;
         this.cooldownTimers = [];
     }
     async onModuleInit() {
@@ -333,10 +336,27 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.logger.warn(`⛔ Ruleta pausada para @${username}: Cooldown activo (${remainingMinutes}m ${remainingSecs}s restantes).`);
             return;
         }
+        const lowerUser = username.toLowerCase().replace(/^@/, '');
+        if (this.lastConsecutiveUser === lowerUser && this.consecutiveSpinsCount >= this.MAX_CONSECUTIVE_SPINS) {
+            this.logger.warn(`⛔ [ANTI-CAMPEO] Tirada bloqueada para @${username}: Ya alcanzó el límite de ${this.MAX_CONSECUTIVE_SPINS} tiradas consecutivas.`);
+            if (this.client && this.isAuthenticated) {
+                const cleanChan = channel.replace(/^#/, '');
+                await this.client.say(cleanChan, `⛔ @${username} ¡Ya tiraste ${this.MAX_CONSECUTIVE_SPINS} veces seguidas! 🐀 Deja que otro espectador juegue para desbloquear tu turno.`);
+            }
+            return;
+        }
         if (this.isSpinActive) {
             this.logger.warn(`⛔ Ruleta pausada para @${username}: Ya hay una tirada en curso.`);
             return;
         }
+        if (this.lastConsecutiveUser === lowerUser) {
+            this.consecutiveSpinsCount++;
+        }
+        else {
+            this.lastConsecutiveUser = lowerUser;
+            this.consecutiveSpinsCount = 1;
+        }
+        this.logger.log(`🛡️ [ANTI-CAMPEO] Usuario en turno: @${username} (Tirada ${this.consecutiveSpinsCount}/${this.MAX_CONSECUTIVE_SPINS})`);
         this.isSpinActive = true;
         this.lastSpinTimestamp = now;
         this.recentSpinUsers.set(username.toLowerCase(), now);
@@ -557,6 +577,11 @@ let TwitchService = TwitchService_1 = class TwitchService {
             };
         }
     }
+    resetConsecutiveSpins() {
+        this.lastConsecutiveUser = null;
+        this.consecutiveSpinsCount = 0;
+        this.logger.log('🔄 [ANTI-CAMPEO] Racha de tiradas consecutivas reseteada manualmente.');
+    }
     getStatus() {
         return {
             channel: this.currentChannel,
@@ -570,6 +595,9 @@ let TwitchService = TwitchService_1 = class TwitchService {
             theme: this.currentTheme,
             announceCountdown: this.announceCountdownInChat,
             isConfigured: Boolean(this.currentChannel && this.currentChannel.trim() !== ''),
+            lastConsecutiveUser: this.lastConsecutiveUser,
+            consecutiveSpinsCount: this.consecutiveSpinsCount,
+            maxConsecutiveSpins: this.MAX_CONSECUTIVE_SPINS,
         };
     }
     sleep(ms) {

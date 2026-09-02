@@ -37,6 +37,9 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         theme: string;
         announceCountdown: boolean;
         isConfigured: boolean;
+        lastConsecutiveUser: string;
+        consecutiveSpinsCount: number;
+        maxConsecutiveSpins: number;
     };
     handleSetCredentials(client: Socket, payload: SetCredentialsPayload): Promise<{
         success: boolean;
@@ -78,5 +81,12 @@ export declare class CasinoGateway implements OnGatewayInit, OnGatewayConnection
         enabled: boolean;
     } | {
         success: boolean;
+    };
+    handleResetConsecutiveSpins(client: Socket): {
+        success: boolean;
+        message: string;
+    } | {
+        success: boolean;
+        message?: undefined;
     };
 }

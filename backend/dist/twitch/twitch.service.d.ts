@@ -32,6 +32,9 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     private isSpinActive;
     private lastSpinTimestamp;
     private recentSpinUsers;
+    private lastConsecutiveUser;
+    private consecutiveSpinsCount;
+    private readonly MAX_CONSECUTIVE_SPINS;
     constructor(casinoGateway: CasinoGateway);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
@@ -75,6 +78,7 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
         success: boolean;
         message: string;
     }>;
+    resetConsecutiveSpins(): void;
     getStatus(): {
         channel: string;
         botUsername: string;
@@ -87,6 +91,9 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
         theme: string;
         announceCountdown: boolean;
         isConfigured: boolean;
+        lastConsecutiveUser: string;
+        consecutiveSpinsCount: number;
+        maxConsecutiveSpins: number;
     };
     private sleep;
     private selectWeightedJackpotPrize;

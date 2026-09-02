@@ -92,6 +92,11 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   private lastSpinTimestamp = 0;
   private recentSpinUsers = new Map<string, number>();
 
+  // Control Anti-Campeo: Máximo 2 tiradas consecutivas por usuario
+  private lastConsecutiveUser: string | null = null;
+  private consecutiveSpinsCount = 0;
+  private readonly MAX_CONSECUTIVE_SPINS = 2;
+
   constructor(
     @Inject(forwardRef(() => CasinoGateway))
     private readonly casinoGateway: CasinoGateway,
@@ -464,10 +469,39 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    const lowerUser = username.toLowerCase().replace(/^@/, '');
+
+    // 2. Comprobación Anti-Campeo (Máximo 2 tiradas consecutivas por usuario)
+    if (this.lastConsecutiveUser === lowerUser && this.consecutiveSpinsCount >= this.MAX_CONSECUTIVE_SPINS) {
+      this.logger.warn(
+        `⛔ [ANTI-CAMPEO] Tirada bloqueada para @${username}: Ya alcanzó el límite de ${this.MAX_CONSECUTIVE_SPINS} tiradas consecutivas.`,
+      );
+      if (this.client && this.isAuthenticated) {
+        const cleanChan = channel.replace(/^#/, '');
+        await this.client.say(
+          cleanChan,
+          `⛔ @${username} ¡Ya tiraste ${this.MAX_CONSECUTIVE_SPINS} veces seguidas! 🐀 Deja que otro espectador juegue para desbloquear tu turno.`,
+        );
+      }
+      return;
+    }
+
     if (this.isSpinActive) {
       this.logger.warn(`⛔ Ruleta pausada para @${username}: Ya hay una tirada en curso.`);
       return;
     }
+
+    // Actualizar racha anti-campeo
+    if (this.lastConsecutiveUser === lowerUser) {
+      this.consecutiveSpinsCount++;
+    } else {
+      this.lastConsecutiveUser = lowerUser;
+      this.consecutiveSpinsCount = 1;
+    }
+
+    this.logger.log(
+      `🛡️ [ANTI-CAMPEO] Usuario en turno: @${username} (Tirada ${this.consecutiveSpinsCount}/${this.MAX_CONSECUTIVE_SPINS})`,
+    );
 
     this.isSpinActive = true;
     this.lastSpinTimestamp = now;
@@ -770,6 +804,12 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  public resetConsecutiveSpins(): void {
+    this.lastConsecutiveUser = null;
+    this.consecutiveSpinsCount = 0;
+    this.logger.log('🔄 [ANTI-CAMPEO] Racha de tiradas consecutivas reseteada manualmente.');
+  }
+
   public getStatus() {
     return {
       channel: this.currentChannel,
@@ -783,6 +823,9 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       theme: this.currentTheme,
       announceCountdown: this.announceCountdownInChat,
       isConfigured: Boolean(this.currentChannel && this.currentChannel.trim() !== ''),
+      lastConsecutiveUser: this.lastConsecutiveUser,
+      consecutiveSpinsCount: this.consecutiveSpinsCount,
+      maxConsecutiveSpins: this.MAX_CONSECUTIVE_SPINS,
     };
   }
 

@@ -14,6 +14,9 @@ export interface TwitchStatusPayload {
   theme?: SlotTheme;
   announceCountdown?: boolean;
   isConfigured?: boolean;
+  lastConsecutiveUser?: string | null;
+  consecutiveSpinsCount?: number;
+  maxConsecutiveSpins?: number;
 }
 
 const LOCAL_STORAGE_KEY = 'casino_streamer_config_v1';
@@ -46,6 +49,11 @@ export const StreamerDashboard: React.FC = () => {
   const [commandType, setCommandType] = useState<string>(stored?.commandType || 'botrix');
   const [customCommand, setCustomCommand] = useState<string>(stored?.customCommand || '!points add {user} {prize}');
   const [cooldownSeconds, setCooldownSeconds] = useState<number>(stored?.cooldownSeconds ?? 300);
+
+  // Estado Anti-Campeo
+  const [consecutiveUser, setConsecutiveUser] = useState<string | null>(null);
+  const [consecutiveCount, setConsecutiveCount] = useState<number>(0);
+  const [maxConsecutive, setMaxConsecutive] = useState<number>(2);
 
   // Tema de la máquina y aviso de cuenta regresiva
   const [selectedTheme, setSelectedTheme] = useState<SlotTheme>(stored?.selectedTheme || 'carnival-green');
@@ -139,12 +147,33 @@ export const StreamerDashboard: React.FC = () => {
       if (status.announceCountdown !== undefined) {
         setAnnounceCountdown(status.announceCountdown);
       }
+      if (status.lastConsecutiveUser !== undefined) {
+        setConsecutiveUser(status.lastConsecutiveUser);
+      }
+      if (status.consecutiveSpinsCount !== undefined) {
+        setConsecutiveCount(status.consecutiveSpinsCount);
+      }
+      if (status.maxConsecutiveSpins !== undefined) {
+        setMaxConsecutive(status.maxConsecutiveSpins);
+      }
     });
 
     return () => {
       s.disconnect();
     };
   }, []);
+
+  const handleResetConsecutiveSpins = () => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('reset-consecutive-spins');
+    setConsecutiveUser(null);
+    setConsecutiveCount(0);
+    setSaveStatus({
+      type: 'info',
+      message: '🔄 Racha anti-campeo reseteada exitosamente. Cualquier usuario puede tirar.',
+    });
+    setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+  };
 
   // Guardar configuración completa en el servidor y en almacenamiento permanente
   const handleSave = (e: React.FormEvent) => {
@@ -909,6 +938,54 @@ export const StreamerDashboard: React.FC = () => {
                 >
                   🔄 Resetear Cooldown Inmediatamente
                 </button>
+              </div>
+            </div>
+
+            {/* Tarjeta de Protección Anti-Campeo (Máximo 2 tiradas consecutivas) */}
+            <div className="dash-card card-anticamp">
+              <div className="anticamp-header-bar">
+                <div className="anticamp-title-group">
+                  <span className="anticamp-icon">🛡️</span>
+                  <div>
+                    <h3 className="anticamp-title">Protección Anti-Campeo (Anti-Ratas 🐀)</h3>
+                    <span className="anticamp-sub">Límite estricto: Máximo {maxConsecutive} tiradas seguidas por usuario</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetConsecutiveSpins}
+                  className="btn-reset-anticamp"
+                  title="Permite que cualquier usuario vuelva a tirar inmediatamente"
+                >
+                  🔄 Resetear Racha
+                </button>
+              </div>
+
+              <div className="anticamp-status-box">
+                <div className="anticamp-info-col">
+                  <span className="anticamp-label">Usuario en Racha Consecutiva:</span>
+                  {consecutiveUser ? (
+                    <div className="anticamp-player-badge">
+                      <span className="player-avatar-icon">👤</span>
+                      <span className="player-name">@{consecutiveUser}</span>
+                      <span className={`player-count-badge ${consecutiveCount >= maxConsecutive ? 'badge-blocked' : 'badge-active'}`}>
+                        {consecutiveCount} / {maxConsecutive} tiradas {consecutiveCount >= maxConsecutive ? '⛔ BLOQUEADO' : '✅ En juego'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="anticamp-player-badge badge-free">
+                      <span className="player-avatar-icon">✨</span>
+                      <span className="player-name">Nadie en racha (Ruleta libre para cualquiera)</span>
+                      <span className="player-count-badge badge-active">0 / {maxConsecutive}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="anticamp-rule-note">
+                  <p>
+                    🔒 <b>Regla automática:</b> Si un viewer tira <b>{maxConsecutive} veces seguidas</b>, la 3ª tirada se le bloqueará automáticamente hasta que <b>otro viewer diferente</b> juegue. En cuanto otro usuario tire, se le restablece su turno al primero.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

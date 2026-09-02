@@ -103,6 +103,14 @@ let CasinoGateway = CasinoGateway_1 = class CasinoGateway {
         }
         return { success: false };
     }
+    handleResetConsecutiveSpins(client) {
+        if (this.twitchService) {
+            this.twitchService.resetConsecutiveSpins();
+            this.server.emit('twitch-status', this.twitchService.getStatus());
+            return { success: true, message: 'Racha anti-campeo reseteada exitosamente' };
+        }
+        return { success: false };
+    }
 };
 exports.CasinoGateway = CasinoGateway;
 __decorate([
@@ -157,6 +165,12 @@ __decorate([
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
     __metadata("design:returntype", void 0)
 ], CasinoGateway.prototype, "handleSetCountdownAnnouncement", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('reset-consecutive-spins'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleResetConsecutiveSpins", null);
 exports.CasinoGateway = CasinoGateway = CasinoGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         cors: {

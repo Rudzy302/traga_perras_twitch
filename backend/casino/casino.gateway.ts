@@ -177,5 +177,18 @@ export class CasinoGateway
     }
     return { success: false };
   }
+
+  /**
+   * Permite resetear manualmente la racha de tiradas consecutivas anti-campeo
+   */
+  @SubscribeMessage('reset-consecutive-spins')
+  handleResetConsecutiveSpins(client: Socket) {
+    if (this.twitchService) {
+      this.twitchService.resetConsecutiveSpins();
+      this.server.emit('twitch-status', this.twitchService.getStatus());
+      return { success: true, message: 'Racha anti-campeo reseteada exitosamente' };
+    }
+    return { success: false };
+  }
 }
 

@@ -3131,6 +3131,160 @@ body.overlay-mode {
 }
 
 /* ==========================================================================
+   TARJETA DE PROTECCIÓN ANTI-CAMPEO (ANTI-RATAS 🐀)
+   ========================================================================== */
+.card-anticamp {
+  background: linear-gradient(135deg, rgba(255, 85, 85, 0.08) 0%, rgba(18, 20, 32, 0.95) 100%) !important;
+  border: 1px solid rgba(255, 85, 85, 0.3) !important;
+  border-radius: 20px !important;
+  padding: 22px 26px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.anticamp-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.anticamp-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.anticamp-icon {
+  font-size: 32px;
+}
+
+.anticamp-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #ff5555;
+  text-shadow: 0 0 12px rgba(255, 85, 85, 0.3);
+}
+
+.anticamp-sub {
+  font-size: 12px;
+  color: #a0a2b4;
+  font-weight: 600;
+}
+
+.btn-reset-anticamp {
+  background: rgba(255, 85, 85, 0.15);
+  color: #ff7777;
+  border: 1px solid rgba(255, 85, 85, 0.35);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-anticamp:hover {
+  background: #ff5555;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(255, 85, 85, 0.5);
+  transform: translateY(-1px);
+}
+
+.anticamp-status-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.anticamp-info-col {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.anticamp-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e0e0ea;
+}
+
+.anticamp-player-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 6px 14px;
+}
+
+.anticamp-player-badge.badge-free {
+  border-color: rgba(0, 255, 136, 0.3);
+  background: rgba(0, 255, 136, 0.08);
+}
+
+.player-avatar-icon {
+  font-size: 16px;
+}
+
+.player-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.player-count-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.player-count-badge.badge-active {
+  background: rgba(0, 255, 136, 0.2);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.4);
+}
+
+.player-count-badge.badge-blocked {
+  background: rgba(255, 68, 68, 0.25);
+  color: #ff4444;
+  border: 1px solid rgba(255, 68, 68, 0.5);
+  animation: pulseBlocked 1.5s infinite;
+}
+
+@keyframes pulseBlocked {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(255, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(255, 68, 68, 0.6);
+  }
+}
+
+.anticamp-rule-note p {
+  margin: 0;
+  font-size: 12px;
+  color: #8c8ea0;
+  line-height: 1.5;
+}
+
+.anticamp-rule-note b {
+  color: #ffd700;
+}
+
+/* ==========================================================================
    SISTEMA DE 8 TEMAS ÚNICOS PARA LA RULETA "RUDZY FEST"
    ========================================================================== */
 
