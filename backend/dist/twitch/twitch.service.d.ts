@@ -1,5 +1,6 @@
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { CasinoGateway } from '../casino/casino.gateway';
+import { GamePickerService } from '../games/game-picker.service';
 export interface TwitchConfig {
     channel: string;
     botUsername?: string;
@@ -15,6 +16,7 @@ export interface PrizeTier {
 }
 export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     private readonly casinoGateway;
+    private readonly gamePickerService;
     private readonly logger;
     private client;
     private isAuthenticated;
@@ -35,7 +37,7 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     private lastConsecutiveUser;
     private consecutiveSpinsCount;
     private readonly MAX_CONSECUTIVE_SPINS;
-    constructor(casinoGateway: CasinoGateway);
+    constructor(casinoGateway: CasinoGateway, gamePickerService: GamePickerService);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
     private getCandidateFilePaths;

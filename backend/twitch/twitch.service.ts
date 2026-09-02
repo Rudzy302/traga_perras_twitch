@@ -10,6 +10,7 @@ import * as tmi from 'tmi.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CasinoGateway } from '../casino/casino.gateway';
+import { GamePickerService } from '../games/game-picker.service';
 
 export interface TwitchConfig {
   channel: string;
@@ -100,10 +101,25 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(forwardRef(() => CasinoGateway))
     private readonly casinoGateway: CasinoGateway,
+    @Inject(forwardRef(() => GamePickerService))
+    private readonly gamePickerService: GamePickerService,
   ) { }
 
   async onModuleInit() {
     this.loadConfigFromDisk();
+
+    // Conectar callbacks de GamePickerService
+    this.gamePickerService.onSendMessageToChat = (msg: string) => {
+      if (this.currentChannel) {
+        this.sendChatMessage(this.currentChannel, msg).catch(() => {});
+      }
+    };
+    this.gamePickerService.onBroadcastState = (state) => {
+      this.casinoGateway.emitGamePickerState(state);
+    };
+    this.gamePickerService.onBroadcastSpinStarted = (payload) => {
+      this.casinoGateway.emitGamePickerSpinStarted(payload);
+    };
 
     this.logger.log(`⏱️ Cooldown configurado a ${Math.round(this.cooldownMs / 1000)} segundos.`);
 
@@ -439,6 +455,18 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`🎰 [Comando !spin Detectado] @${cleanUser} activó la ruleta`);
       const weightedPrize = this.selectWeightedJackpotPrize();
       await this.executeSpinFlow(channel, cleanUser, weightedPrize);
+      return;
+    }
+
+    // =========================================================================
+    // CASO 3: COMANDO !juego (o !game) PARA LA SELECTORA DE JUEGOS
+    // Funciona con comandos directos y con canjes de la tienda de BotRix
+    // =========================================================================
+    const juegoMatch = trimmedMsg.match(/^!(?:juego|game)\s*(?:[:\-])?\s*(.+)/i);
+    if (juegoMatch) {
+      const rawGameText = juegoMatch[1].trim();
+      this.logger.log(`🎮 [Comando !juego Detectado de @${sender}]: "${rawGameText}"`);
+      this.gamePickerService.processVote(sender, rawGameText);
       return;
     }
   }

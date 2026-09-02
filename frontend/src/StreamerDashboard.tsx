@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import SlotMachine, { SlotTheme, THEMES_LIST } from './SlotMachine';
+import { GamePicker, GamePickerState, GAME_PICKER_THEMES } from './GamePicker';
 
 export interface TwitchStatusPayload {
   channel: string;
@@ -21,7 +22,7 @@ export interface TwitchStatusPayload {
 
 const LOCAL_STORAGE_KEY = 'casino_streamer_config_v1';
 
-export type DashboardTab = 'connect' | 'rudzy-fest' | 'more-games';
+export type DashboardTab = 'connect' | 'rudzy-fest' | 'game-picker' | 'more-games';
 
 export const StreamerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('connect');
@@ -65,6 +66,22 @@ export const StreamerDashboard: React.FC = () => {
     message: '',
   });
   const [copiedObsUrl, setCopiedObsUrl] = useState<boolean>(false);
+
+  // Estado de la Selectora de Juegos
+  const [gamePickerState, setGamePickerState] = useState<GamePickerState | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState<string>('');
+  const [catalogPage, setCatalogPage] = useState<number>(1);
+  const [catalogData, setCatalogData] = useState<{ games: any[]; total: number; page: number; totalPages: number }>({
+    games: [],
+    total: 0,
+    page: 1,
+    totalPages: 1,
+  });
+  const [selectedPickerDuration, setSelectedPickerDuration] = useState<number>(120);
+  const [customGameName, setCustomGameName] = useState<string>('');
+  const [customGameCategory, setCustomGameCategory] = useState<string>('');
+  const [showAddCustomModal, setShowAddCustomModal] = useState<boolean>(false);
+  const [copiedPickerObsUrl, setCopiedPickerObsUrl] = useState<boolean>(false);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -158,10 +175,114 @@ export const StreamerDashboard: React.FC = () => {
       }
     });
 
+    s.on('game-picker-state', (state: GamePickerState) => {
+      setGamePickerState(state);
+    });
+
     return () => {
       s.disconnect();
     };
   }, []);
+
+  const fetchCatalog = (query = catalogQuery, page = catalogPage) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit(
+      'search-game-picker-catalog',
+      { query, page, pageSize: 10 },
+      (res: { games: any[]; total: number; page: number; totalPages: number }) => {
+        if (res) {
+          setCatalogData(res);
+          setCatalogPage(res.page);
+        }
+      },
+    );
+  };
+
+  // Cargar catálogo cada vez que se entra a la pestaña de Selectora de Juegos
+  useEffect(() => {
+    if (activeTab === 'game-picker') {
+      fetchCatalog(catalogQuery, catalogPage);
+    }
+  }, [activeTab]);
+
+  const handleSearchCatalogSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCatalogPage(1);
+    fetchCatalog(catalogQuery, 1);
+  };
+
+  const handleStartPickerVoting = (duration = selectedPickerDuration) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('start-game-picker-voting', { durationSeconds: duration });
+    setSaveStatus({
+      type: 'success',
+      message: `🎮 ¡Votación iniciada por ${duration >= 60 ? `${Math.round(duration / 60)} min` : `${duration}s`}!`,
+    });
+    setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+  };
+
+  const handleStopPickerVoting = () => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('stop-game-picker-voting');
+    setSaveStatus({
+      type: 'info',
+      message: '🛑 Cola cerrada manualmente. ¡Girando la Selectora en pantalla!',
+    });
+    setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+  };
+
+  const handleEnableGame = (id: string) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('enable-game', { id }, (res: { success: boolean }) => {
+      if (res?.success) fetchCatalog();
+    });
+  };
+
+  const handleDisableGame = (id: string) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('disable-game', { id }, (res: { success: boolean }) => {
+      if (res?.success) fetchCatalog();
+    });
+  };
+
+  const handleAddCustomGameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customGameName.trim()) return;
+    if (!socketRef.current) return;
+
+    socketRef.current.emit(
+      'add-custom-game',
+      { name: customGameName.trim(), category: customGameCategory.trim() || 'Juego Personalizado' },
+      (res: { success: boolean }) => {
+        if (res?.success) {
+          setShowAddCustomModal(false);
+          setCustomGameName('');
+          setCustomGameCategory('');
+          fetchCatalog();
+          setSaveStatus({
+            type: 'success',
+            message: '✅ ¡Juego personalizado agregado y habilitado!',
+          });
+          setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+        }
+      },
+    );
+  };
+
+  const handleResetGameWonHistory = () => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('reset-game-won-history');
+    setSaveStatus({
+      type: 'info',
+      message: '🔄 Historial de juegos ganadores reseteado.',
+    });
+    setTimeout(() => setSaveStatus({ type: '', message: '' }), 3000);
+  };
+
+  const handleSetGamePickerTheme = (theme: string) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('set-game-picker-theme', { theme });
+  };
 
   const handleResetConsecutiveSpins = () => {
     if (!socketRef.current) return;
@@ -405,12 +526,24 @@ export const StreamerDashboard: React.FC = () => {
 
         <button
           type="button"
+          className={`tab-nav-btn ${activeTab === 'game-picker' ? 'active' : ''}`}
+          onClick={() => setActiveTab('game-picker')}
+        >
+          <span className="tab-icon">🎮</span>
+          <div className="tab-label-group">
+            <span className="tab-title">3. Selectora de Juegos</span>
+            <span className="tab-sub">Votación en Chat, Catálogo & Ruleta</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
           className={`tab-nav-btn ${activeTab === 'more-games' ? 'active' : ''}`}
           onClick={() => setActiveTab('more-games')}
         >
           <span className="tab-icon">✨</span>
           <div className="tab-label-group">
-            <span className="tab-title">3. Próximos Juegos (+)</span>
+            <span className="tab-title">4. Próximos Juegos (+)</span>
             <span className="tab-sub">Catálogo en desarrollo</span>
           </div>
         </button>
@@ -992,7 +1125,424 @@ export const StreamerDashboard: React.FC = () => {
         )}
 
         {/* =========================================================================
-            PESTAÑA 3: PRÓXIMOS JUEGOS (+) (Arquitectura Multijuegos a Futuro)
+            PESTAÑA 3: LA SELECTORA DE JUEGOS 🎮
+            ========================================================================= */}
+        {activeTab === 'game-picker' && (
+          <div className="tab-pane-container game-picker-pane">
+            {/* 1. Tarjeta Superior: Controles del Stream & OBS */}
+            <div className="dash-card card-gp-controls">
+              <div className="card-header-row">
+                <div className="card-header-titles">
+                  <h2>🎮 La Selectora de Juegos (Game Picker Horizontal)</h2>
+                  <p className="card-desc">
+                    Decide en vivo qué juego streamear mediante votaciones democráticas en tu chat de Twitch (<code>!juego &lt;nombre&gt;</code>).
+                  </p>
+                </div>
+                <div className="gp-header-actions">
+                  <button
+                    type="button"
+                    className="btn-action-ghost"
+                    onClick={handleResetGameWonHistory}
+                  >
+                    🧹 Resetear Historial Ganadores
+                  </button>
+                </div>
+              </div>
+
+              {/* Fila 1: URL para OBS */}
+              <div className="obs-url-box-clean">
+                <div className="obs-url-badge">
+                  <span className="obs-dot-live"></span>
+                  <span>URL PARA OBS (SELECTORA TRANSPARENTE):</span>
+                </div>
+                <div className="obs-url-input-wrap">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/?gamepicker=true&overlay=true`}
+                    className="obs-url-field"
+                  />
+                  <button
+                    type="button"
+                    className={`btn-copy-obs ${copiedPickerObsUrl ? 'copied' : ''}`}
+                    onClick={() => {
+                      const url = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/?gamepicker=true&overlay=true`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedPickerObsUrl(true);
+                      setTimeout(() => setCopiedPickerObsUrl(false), 2500);
+                    }}
+                  >
+                    {copiedPickerObsUrl ? '✅ ¡Copiado!' : '📋 Copiar URL'}
+                  </button>
+                  <a
+                    href="/?gamepicker=true&overlay=true"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-open-obs-preview"
+                  >
+                    🔗 Abrir
+                  </a>
+                </div>
+              </div>
+
+              {/* Fila 2: Selector de Duración y Botones de Votación */}
+              <div className="gp-control-toolbar">
+                <div className="gp-timer-select-group">
+                  <span className="gp-toolbar-label">⏱️ Duración de Votación:</span>
+                  <div className="gp-time-chips">
+                    {[
+                      { label: '1 min', sec: 60 },
+                      { label: '2 min', sec: 120 },
+                      { label: '3 min', sec: 180 },
+                      { label: '5 min', sec: 300 },
+                    ].map((t) => (
+                      <button
+                        key={t.sec}
+                        type="button"
+                        className={`gp-time-chip ${selectedPickerDuration === t.sec ? 'active' : ''}`}
+                        onClick={() => setSelectedPickerDuration(t.sec)}
+                        disabled={gamePickerState?.votingState === 'VOTING' || gamePickerState?.votingState === 'SPINNING'}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="gp-main-action-buttons">
+                  {gamePickerState?.votingState === 'IDLE' && (
+                    <button
+                      type="button"
+                      className="btn-gp-trigger start-voting"
+                      onClick={() => handleStartPickerVoting(selectedPickerDuration)}
+                    >
+                      <span className="btn-icon">🟢</span>
+                      <span>INICIAR / ACTIVAR SELECTORA ({Math.round(selectedPickerDuration / 60)} min)</span>
+                    </button>
+                  )}
+
+                  {gamePickerState?.votingState === 'VOTING' && (
+                    <button
+                      type="button"
+                      className="btn-gp-trigger stop-voting"
+                      onClick={handleStopPickerVoting}
+                    >
+                      <span className="btn-icon">🛑</span>
+                      <span>GIRAR AHORA (Cerrar Cola Inmediatamente)</span>
+                    </button>
+                  )}
+
+                  {(gamePickerState?.votingState === 'SPINNING' || gamePickerState?.votingState === 'WINNER') && (
+                    <button type="button" className="btn-gp-trigger running-spin" disabled>
+                      <span className="btn-icon">🎰</span>
+                      <span>GIRANDO EN PANTALLA...</span>
+                    </button>
+                  )}
+
+                  {gamePickerState?.votingState === 'COOLDOWN' && (
+                    <button type="button" className="btn-gp-trigger cooldown-mode" disabled>
+                      <span className="btn-icon">🔒</span>
+                      <span>MODO SILENCIO (25s)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Fila 3: Temas Visuales para la Selectora */}
+              <div className="gp-theme-picker-row">
+                <span className="gp-toolbar-label">🎨 Tema Visual Horizontal:</span>
+                <div className="gp-theme-chips">
+                  {GAME_PICKER_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      className={`gp-theme-chip ${gamePickerState?.activeTheme === theme.id ? 'active' : ''}`}
+                      onClick={() => handleSetGamePickerTheme(theme.id)}
+                      style={{
+                        borderColor: gamePickerState?.activeTheme === theme.id ? theme.color : undefined,
+                      }}
+                    >
+                      <span>{theme.icon}</span>
+                      <span>{theme.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Previsualización en Vivo de la Selectora */}
+            <div className="dash-card card-gp-preview">
+              <div className="preview-card-header">
+                <h3>📺 Vista Previa de la Selectora en Pantalla</h3>
+                <span className="preview-mode-tag">
+                  {gamePickerState?.votingState === 'IDLE' ? 'PAUSADA' : `ESTADO: ${gamePickerState?.votingState}`}
+                </span>
+              </div>
+              <div className="gp-preview-stage-container">
+                <GamePicker socket={socketRef.current} isOverlay={false} />
+              </div>
+            </div>
+
+            {/* 3. DOS PANELES CLAVE: Explorador 10 en 10 vs Habilitados Hoy */}
+            <div className="gp-two-panels-grid">
+              {/* PANEL IZQUIERDO: Explorador de Miles de Videojuegos */}
+              <div className="dash-card card-gp-explorer">
+                <div className="panel-title-row">
+                  <div className="panel-title-left">
+                    <h3>🔍 1. Explorador Global de Videojuegos</h3>
+                    <p className="panel-desc">
+                      Busca entre miles de juegos de PC, consolas y Steam. Habilita los que tengas instalados.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-add-custom-game-open"
+                    onClick={() => setShowAddCustomModal(true)}
+                  >
+                    ➕ Agregar Personalizado
+                  </button>
+                </div>
+
+                {/* Buscador Rápido */}
+                <form className="gp-search-form" onSubmit={handleSearchCatalogSubmit}>
+                  <div className="gp-search-input-wrap">
+                    <span className="search-icon">🔎</span>
+                    <input
+                      type="text"
+                      placeholder="Buscar juego (ej: Minecraft, Elden Ring, Lethal, Silent Hill, Mario...)"
+                      value={catalogQuery}
+                      onChange={(e) => {
+                        setCatalogQuery(e.target.value);
+                        fetchCatalog(e.target.value, 1);
+                      }}
+                      className="gp-search-input"
+                    />
+                    {catalogQuery && (
+                      <button
+                        type="button"
+                        className="btn-clear-search"
+                        onClick={() => {
+                          setCatalogQuery('');
+                          fetchCatalog('', 1);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {/* Lista Paginada de 10 en 10 */}
+                <div className="gp-catalog-list-wrap">
+                  {catalogData.games.length === 0 ? (
+                    <div className="gp-catalog-empty">
+                      <span>❌ No se encontraron juegos con ese nombre.</span>
+                    </div>
+                  ) : (
+                    <div className="gp-catalog-table">
+                      {catalogData.games.map((game) => (
+                        <div key={game.id} className={`gp-catalog-row ${game.isEnabled ? 'row-enabled' : ''}`}>
+                          <div className="gp-row-info">
+                            <span className="gp-game-icon">🎮</span>
+                            <div className="gp-game-meta">
+                              <span className="gp-row-name">{game.name}</span>
+                              <span className="gp-row-cat">{game.category} • {game.platform || 'PC / Consolas'}</span>
+                            </div>
+                          </div>
+
+                          <div className="gp-row-action">
+                            {game.hasWonToday && (
+                              <span className="badge-already-won">🏆 Ya ganó hoy</span>
+                            )}
+                            {game.isEnabled ? (
+                              <button
+                                type="button"
+                                className="btn-disable-game"
+                                onClick={() => handleDisableGame(game.id)}
+                              >
+                                ✅ Habilitado (Quitar)
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-enable-game"
+                                onClick={() => handleEnableGame(game.id)}
+                              >
+                                ➕ Habilitar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Paginación Limpia 10 en 10 */}
+                <div className="gp-pagination-controls">
+                  <button
+                    type="button"
+                    className="btn-page-nav"
+                    disabled={catalogPage <= 1}
+                    onClick={() => {
+                      const newPage = catalogPage - 1;
+                      setCatalogPage(newPage);
+                      fetchCatalog(catalogQuery, newPage);
+                    }}
+                  >
+                    ◀ Anterior
+                  </button>
+
+                  <span className="gp-page-indicator">
+                    Página <b>{catalogData.page}</b> de <b>{catalogData.totalPages}</b> ({catalogData.total.toLocaleString()} juegos)
+                  </span>
+
+                  <button
+                    type="button"
+                    className="btn-page-nav"
+                    disabled={catalogPage >= catalogData.totalPages}
+                    onClick={() => {
+                      const newPage = catalogPage + 1;
+                      setCatalogPage(newPage);
+                      fetchCatalog(catalogQuery, newPage);
+                    }}
+                  >
+                    Siguiente ▶
+                  </button>
+                </div>
+              </div>
+
+              {/* PANEL DERECHO: Juegos Habilitados Hoy & Historial de Ganadores */}
+              <div className="dash-card card-gp-enabled-list">
+                <div className="panel-title-row">
+                  <div className="panel-title-left">
+                    <h3>🎯 2. Juegos Habilitados para el Directo</h3>
+                    <p className="panel-desc">
+                      Tu chat sólo podrá votar por estos juegos con <code>!juego</code>.
+                    </p>
+                  </div>
+                  <span className="badge-enabled-count">
+                    {gamePickerState?.enabledGameIds.length || 0} activos
+                  </span>
+                </div>
+
+                <div className="gp-enabled-cards-scroll">
+                  {(!gamePickerState?.enabledGameIds || gamePickerState.enabledGameIds.length === 0) ? (
+                    <div className="gp-no-enabled-hint">
+                      <span>⚠️ No has habilitado ningún juego todavía. Usa el panel izquierdo para habilitar juegos.</span>
+                    </div>
+                  ) : (
+                    <div className="gp-enabled-grid">
+                      {gamePickerState.enabledGameIds.map((id) => {
+                        const found = catalogData.games.find((g) => g.id === id);
+                        return (
+                          <div key={id} className="gp-enabled-card">
+                            <div className="gp-card-left">
+                              <span className="gp-enabled-icon">🎯</span>
+                              <span className="gp-enabled-name">{found ? found.name : id}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-remove-enabled"
+                              onClick={() => handleDisableGame(id)}
+                              title="Quitar juego"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Subtarjeta: Historial de Ganadores (Anti-Repetición) */}
+                <div className="gp-won-history-subcard">
+                  <div className="won-history-header">
+                    <h4>🏆 Juegos que ya ganaron hoy (Bloqueados):</h4>
+                    {gamePickerState?.previouslyWonGames && gamePickerState.previouslyWonGames.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn-clear-won-history"
+                        onClick={handleResetGameWonHistory}
+                      >
+                        🧹 Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="won-history-chips">
+                    {(!gamePickerState?.previouslyWonGames || gamePickerState.previouslyWonGames.length === 0) ? (
+                      <span className="no-won-yet">Ningún juego ha ganado aún en esta sesión.</span>
+                    ) : (
+                      gamePickerState.previouslyWonGames.map((wonName, idx) => (
+                        <span key={idx} className="won-game-chip">
+                          🏆 {wonName}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* MODAL PARA AGREGAR JUEGO PERSONALIZADO */}
+            {showAddCustomModal && (
+              <div className="gp-modal-backdrop" onClick={() => setShowAddCustomModal(false)}>
+                <div className="gp-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="gp-modal-header">
+                    <h3>➕ Agregar Juego Personalizado</h3>
+                    <button
+                      type="button"
+                      className="btn-close-modal"
+                      onClick={() => setShowAddCustomModal(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <form onSubmit={handleAddCustomGameSubmit} className="gp-modal-form">
+                    <div className="form-group">
+                      <label>Nombre del Juego:</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Lethal Company con Mods, Torneo Smash..."
+                        value={customGameName}
+                        onChange={(e) => setCustomGameName(e.target.value)}
+                        required
+                        className="gp-input-text"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Categoría / Tipo:</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Terror Cooperativo, Especial Stream..."
+                        value={customGameCategory}
+                        onChange={(e) => setCustomGameCategory(e.target.value)}
+                        className="gp-input-text"
+                      />
+                    </div>
+                    <div className="modal-actions-row">
+                      <button
+                        type="button"
+                        className="btn-modal-cancel"
+                        onClick={() => setShowAddCustomModal(false)}
+                      >
+                        Cancelar
+                      </button>
+                      <button type="submit" className="btn-modal-save">
+                        Guardar & Habilitar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* =========================================================================
+            PESTAÑA 4: PRÓXIMOS JUEGOS (+) (Arquitectura Multijuegos a Futuro)
             ========================================================================= */}
         {activeTab === 'more-games' && (
           <div className="tab-pane-container games-pane">

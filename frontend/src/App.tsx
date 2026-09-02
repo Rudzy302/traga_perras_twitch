@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import SlotMachine, { SlotTheme } from './SlotMachine';
+import { GamePicker } from './GamePicker';
 import StreamerDashboard from './StreamerDashboard';
 import './App.css';
 
@@ -10,6 +11,14 @@ export const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     return params.get('overlay') === 'true' || params.has('obs');
   });
+
+  const [isGamePickerMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('gamepicker') === 'true';
+  });
+
+  const [overlaySocket, setOverlaySocket] = useState<Socket | null>(null);
 
   const [syncedTheme, setSyncedTheme] = useState<SlotTheme>(() => {
     if (typeof window !== 'undefined') {
@@ -35,7 +44,7 @@ export const App: React.FC = () => {
       document.documentElement.style.overflow = 'hidden';
       document.body.style.background = 'transparent';
 
-      // Conectar socket para sincronizar tema en tiempo real si cambia en el dashboard
+      // Conectar socket para sincronizar tema y eventos en OBS
       const wsUrl =
         typeof window !== 'undefined'
           ? window.location.port === '5173'
@@ -46,6 +55,8 @@ export const App: React.FC = () => {
       const s: Socket = io(wsUrl, {
         transports: ['websocket', 'polling'],
       });
+
+      setOverlaySocket(s);
 
       s.on('theme-change', (newTheme: SlotTheme) => {
         if (newTheme) {
@@ -79,6 +90,14 @@ export const App: React.FC = () => {
   }, [isOverlayMode]);
 
   if (isOverlayMode) {
+    if (isGamePickerMode) {
+      return (
+        <main className="obs-overlay-main">
+          <GamePicker socket={overlaySocket} isOverlay={true} />
+        </main>
+      );
+    }
+
     const params = new URLSearchParams(window.location.search);
     const themeParam = (params.get('theme') as SlotTheme) || syncedTheme;
 
@@ -93,3 +112,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

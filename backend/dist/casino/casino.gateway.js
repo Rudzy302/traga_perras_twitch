@@ -18,9 +18,11 @@ const websockets_1 = require("@nestjs/websockets");
 const common_1 = require("@nestjs/common");
 const socket_io_1 = require("socket.io");
 const twitch_service_1 = require("../twitch/twitch.service");
+const game_picker_service_1 = require("../games/game-picker.service");
 let CasinoGateway = CasinoGateway_1 = class CasinoGateway {
-    constructor(twitchService) {
+    constructor(twitchService, gamePickerService) {
         this.twitchService = twitchService;
+        this.gamePickerService = gamePickerService;
         this.logger = new common_1.Logger(CasinoGateway_1.name);
     }
     afterInit(server) {
@@ -30,6 +32,9 @@ let CasinoGateway = CasinoGateway_1 = class CasinoGateway {
         this.logger.log(`🟢 Cliente conectado: ${client.id}`);
         if (this.twitchService) {
             client.emit('twitch-status', this.twitchService.getStatus());
+        }
+        if (this.gamePickerService) {
+            client.emit('game-picker-state', this.gamePickerService.getState());
         }
     }
     handleDisconnect(client) {
@@ -111,6 +116,56 @@ let CasinoGateway = CasinoGateway_1 = class CasinoGateway {
         }
         return { success: false };
     }
+    emitGamePickerState(state) {
+        if (this.server) {
+            this.server.emit('game-picker-state', state);
+        }
+    }
+    emitGamePickerSpinStarted(payload) {
+        if (this.server) {
+            this.server.emit('game-picker-spin-started', payload);
+        }
+    }
+    handleGetGamePickerState(client) {
+        return this.gamePickerService.getState();
+    }
+    handleSearchGameCatalog(client, payload) {
+        return this.gamePickerService.searchCatalog(payload?.query || '', payload?.page || 1, payload?.pageSize || 10);
+    }
+    handleStartGamePickerVoting(client, payload) {
+        this.gamePickerService.startVoting(payload?.durationSeconds || 120);
+        return { success: true };
+    }
+    handleStopGamePickerVoting(client) {
+        this.gamePickerService.stopVotingManual();
+        return { success: true };
+    }
+    handleEnableGame(client, payload) {
+        const success = this.gamePickerService.enableGame(payload?.id);
+        return { success };
+    }
+    handleDisableGame(client, payload) {
+        const success = this.gamePickerService.disableGame(payload?.id);
+        return { success };
+    }
+    handleAddCustomGame(client, payload) {
+        if (payload?.name) {
+            const created = this.gamePickerService.addCustomGame(payload.name, payload.category);
+            return { success: true, game: created };
+        }
+        return { success: false, message: 'Nombre de juego requerido' };
+    }
+    handleResetGameWonHistory(client) {
+        this.gamePickerService.resetPreviouslyWonGames();
+        return { success: true };
+    }
+    handleSetGamePickerTheme(client, payload) {
+        if (payload?.theme) {
+            this.gamePickerService.setTheme(payload.theme);
+            return { success: true };
+        }
+        return { success: false };
+    }
 };
 exports.CasinoGateway = CasinoGateway;
 __decorate([
@@ -171,6 +226,60 @@ __decorate([
     __metadata("design:paramtypes", [socket_io_1.Socket]),
     __metadata("design:returntype", void 0)
 ], CasinoGateway.prototype, "handleResetConsecutiveSpins", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('get-game-picker-state'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleGetGamePickerState", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('search-game-picker-catalog'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleSearchGameCatalog", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('start-game-picker-voting'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleStartGamePickerVoting", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('stop-game-picker-voting'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleStopGamePickerVoting", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('enable-game'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleEnableGame", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('disable-game'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleDisableGame", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('add-custom-game'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleAddCustomGame", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('reset-game-won-history'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleResetGameWonHistory", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('set-game-picker-theme'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], CasinoGateway.prototype, "handleSetGamePickerTheme", null);
 exports.CasinoGateway = CasinoGateway = CasinoGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         cors: {
@@ -178,6 +287,8 @@ exports.CasinoGateway = CasinoGateway = CasinoGateway_1 = __decorate([
         },
     }),
     __param(0, (0, common_1.Inject)((0, common_1.forwardRef)(() => twitch_service_1.TwitchService))),
-    __metadata("design:paramtypes", [twitch_service_1.TwitchService])
+    __param(1, (0, common_1.Inject)((0, common_1.forwardRef)(() => game_picker_service_1.GamePickerService))),
+    __metadata("design:paramtypes", [twitch_service_1.TwitchService,
+        game_picker_service_1.GamePickerService])
 ], CasinoGateway);
 //# sourceMappingURL=casino.gateway.js.map

@@ -19,9 +19,11 @@ const tmi = require("tmi.js");
 const fs = require("fs");
 const path = require("path");
 const casino_gateway_1 = require("../casino/casino.gateway");
+const game_picker_service_1 = require("../games/game-picker.service");
 let TwitchService = TwitchService_1 = class TwitchService {
-    constructor(casinoGateway) {
+    constructor(casinoGateway, gamePickerService) {
         this.casinoGateway = casinoGateway;
+        this.gamePickerService = gamePickerService;
         this.logger = new common_1.Logger(TwitchService_1.name);
         this.client = null;
         this.isAuthenticated = false;
@@ -73,6 +75,17 @@ let TwitchService = TwitchService_1 = class TwitchService {
     }
     async onModuleInit() {
         this.loadConfigFromDisk();
+        this.gamePickerService.onSendMessageToChat = (msg) => {
+            if (this.currentChannel) {
+                this.sendChatMessage(this.currentChannel, msg).catch(() => { });
+            }
+        };
+        this.gamePickerService.onBroadcastState = (state) => {
+            this.casinoGateway.emitGamePickerState(state);
+        };
+        this.gamePickerService.onBroadcastSpinStarted = (payload) => {
+            this.casinoGateway.emitGamePickerSpinStarted(payload);
+        };
         this.logger.log(`⏱️ Cooldown configurado a ${Math.round(this.cooldownMs / 1000)} segundos.`);
         if (this.currentChannel.trim() !== '') {
             await this.connectToTwitch();
@@ -323,6 +336,13 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.logger.log(`🎰 [Comando !spin Detectado] @${cleanUser} activó la ruleta`);
             const weightedPrize = this.selectWeightedJackpotPrize();
             await this.executeSpinFlow(channel, cleanUser, weightedPrize);
+            return;
+        }
+        const juegoMatch = trimmedMsg.match(/^!(?:juego|game)\s*(?:[:\-])?\s*(.+)/i);
+        if (juegoMatch) {
+            const rawGameText = juegoMatch[1].trim();
+            this.logger.log(`🎮 [Comando !juego Detectado de @${sender}]: "${rawGameText}"`);
+            this.gamePickerService.processVote(sender, rawGameText);
             return;
         }
     }
@@ -620,6 +640,8 @@ exports.TwitchService = TwitchService;
 exports.TwitchService = TwitchService = TwitchService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, common_1.Inject)((0, common_1.forwardRef)(() => casino_gateway_1.CasinoGateway))),
-    __metadata("design:paramtypes", [casino_gateway_1.CasinoGateway])
+    __param(1, (0, common_1.Inject)((0, common_1.forwardRef)(() => game_picker_service_1.GamePickerService))),
+    __metadata("design:paramtypes", [casino_gateway_1.CasinoGateway,
+        game_picker_service_1.GamePickerService])
 ], TwitchService);
 //# sourceMappingURL=twitch.service.js.map

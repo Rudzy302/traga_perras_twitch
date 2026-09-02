@@ -9,6 +9,7 @@ import {
 import { Logger, Inject, forwardRef } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { TwitchService } from '../twitch/twitch.service';
+import { GamePickerService } from '../games/game-picker.service';
 
 export interface StartSpinPayload {
   username: string;
@@ -42,6 +43,8 @@ export class CasinoGateway
   constructor(
     @Inject(forwardRef(() => TwitchService))
     private readonly twitchService: TwitchService,
+    @Inject(forwardRef(() => GamePickerService))
+    private readonly gamePickerService: GamePickerService,
   ) { }
 
   afterInit(server: Server) {
@@ -50,9 +53,12 @@ export class CasinoGateway
 
   handleConnection(client: Socket) {
     this.logger.log(`🟢 Cliente conectado: ${client.id}`);
-    // Enviar estado actual de conexión de Twitch al cliente recién conectado
+    // Enviar estado actual de conexión de Twitch y de la Selectora al cliente recién conectado
     if (this.twitchService) {
       client.emit('twitch-status', this.twitchService.getStatus());
+    }
+    if (this.gamePickerService) {
+      client.emit('game-picker-state', this.gamePickerService.getState());
     }
   }
 
@@ -190,5 +196,80 @@ export class CasinoGateway
     }
     return { success: false };
   }
+
+  // =========================================================================
+  // EVENTOS Y MÉTODOS PARA LA SELECTORA DE JUEGOS
+  // =========================================================================
+
+  emitGamePickerState(state: any): void {
+    if (this.server) {
+      this.server.emit('game-picker-state', state);
+    }
+  }
+
+  emitGamePickerSpinStarted(payload: any): void {
+    if (this.server) {
+      this.server.emit('game-picker-spin-started', payload);
+    }
+  }
+
+  @SubscribeMessage('get-game-picker-state')
+  handleGetGamePickerState(client: Socket) {
+    return this.gamePickerService.getState();
+  }
+
+  @SubscribeMessage('search-game-picker-catalog')
+  handleSearchGameCatalog(client: Socket, payload: { query?: string; page?: number; pageSize?: number }) {
+    return this.gamePickerService.searchCatalog(payload?.query || '', payload?.page || 1, payload?.pageSize || 10);
+  }
+
+  @SubscribeMessage('start-game-picker-voting')
+  handleStartGamePickerVoting(client: Socket, payload: { durationSeconds: number }) {
+    this.gamePickerService.startVoting(payload?.durationSeconds || 120);
+    return { success: true };
+  }
+
+  @SubscribeMessage('stop-game-picker-voting')
+  handleStopGamePickerVoting(client: Socket) {
+    this.gamePickerService.stopVotingManual();
+    return { success: true };
+  }
+
+  @SubscribeMessage('enable-game')
+  handleEnableGame(client: Socket, payload: { id: string }) {
+    const success = this.gamePickerService.enableGame(payload?.id);
+    return { success };
+  }
+
+  @SubscribeMessage('disable-game')
+  handleDisableGame(client: Socket, payload: { id: string }) {
+    const success = this.gamePickerService.disableGame(payload?.id);
+    return { success };
+  }
+
+  @SubscribeMessage('add-custom-game')
+  handleAddCustomGame(client: Socket, payload: { name: string; category?: string }) {
+    if (payload?.name) {
+      const created = this.gamePickerService.addCustomGame(payload.name, payload.category);
+      return { success: true, game: created };
+    }
+    return { success: false, message: 'Nombre de juego requerido' };
+  }
+
+  @SubscribeMessage('reset-game-won-history')
+  handleResetGameWonHistory(client: Socket) {
+    this.gamePickerService.resetPreviouslyWonGames();
+    return { success: true };
+  }
+
+  @SubscribeMessage('set-game-picker-theme')
+  handleSetGamePickerTheme(client: Socket, payload: { theme: string }) {
+    if (payload?.theme) {
+      this.gamePickerService.setTheme(payload.theme);
+      return { success: true };
+    }
+    return { success: false };
+  }
 }
+
 

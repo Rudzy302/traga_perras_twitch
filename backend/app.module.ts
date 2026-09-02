@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CasinoGateway } from './casino/casino.gateway';
 import { TwitchService } from './twitch/twitch.service';
+import { GamePickerService } from './games/game-picker.service';
 
 import * as path from 'path';
 
@@ -18,7 +19,7 @@ import * as path from 'path';
       ],
     }),
   ],
-  providers: [CasinoGateway, TwitchService],
-  exports: [CasinoGateway, TwitchService],
+  providers: [CasinoGateway, TwitchService, GamePickerService],
+  exports: [CasinoGateway, TwitchService, GamePickerService],
 })
 export class AppModule { }

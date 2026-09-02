@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const casino_gateway_1 = require("./casino/casino.gateway");
 const twitch_service_1 = require("./twitch/twitch.service");
+const game_picker_service_1 = require("./games/game-picker.service");
 const path = require("path");
 let AppModule = class AppModule {
 };
@@ -29,8 +30,8 @@ exports.AppModule = AppModule = __decorate([
                 ],
             }),
         ],
-        providers: [casino_gateway_1.CasinoGateway, twitch_service_1.TwitchService],
-        exports: [casino_gateway_1.CasinoGateway, twitch_service_1.TwitchService],
+        providers: [casino_gateway_1.CasinoGateway, twitch_service_1.TwitchService, game_picker_service_1.GamePickerService],
+        exports: [casino_gateway_1.CasinoGateway, twitch_service_1.TwitchService, game_picker_service_1.GamePickerService],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map
