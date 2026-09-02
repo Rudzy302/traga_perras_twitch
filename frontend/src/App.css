@@ -4373,10 +4373,22 @@ body.overlay-mode {
 
 .top-pointer {
   top: 4px;
+  transition: transform 0.04s ease;
+}
+
+.top-pointer.needle-tick-active {
+  transform: translateX(-50%) translateY(3px) scale(1.2);
+  filter: drop-shadow(0 0 14px #ffffff) brightness(1.4);
 }
 
 .bottom-pointer {
   bottom: 4px;
+  transition: transform 0.04s ease;
+}
+
+.bottom-pointer.needle-tick-active {
+  transform: translateX(-50%) translateY(-3px) scale(1.2);
+  filter: drop-shadow(0 0 14px #ffffff) brightness(1.4);
 }
 
 .gp-center-target-line {
