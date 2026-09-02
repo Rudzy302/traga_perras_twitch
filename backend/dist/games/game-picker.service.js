@@ -177,9 +177,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.previouslyWonGames.clear();
         this.saveConfig();
         this.broadcastCurrentState();
-        if (this.onSendMessageToChat) {
-            this.onSendMessageToChat('🔄 El historial de juegos ganadores ha sido reseteado. ¡Todos los títulos vuelven a estar disponibles!');
-        }
     }
     setTheme(theme) {
         this.activeTheme = theme;
@@ -196,9 +193,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.timeRemaining = this.duration;
         this.votingState = 'VOTING';
         this.logger.log(`Votación de Selectora iniciada por ${this.duration} segundos.`);
-        if (this.onSendMessageToChat) {
-            this.onSendMessageToChat('🎮 ¡Votaciones disponibles! Usa el comando !juego y pon el nombre del juego que quieras que sea jugado.');
-        }
         this.broadcastCurrentState();
         this.votingTimer = setInterval(() => {
             this.timeRemaining--;
@@ -240,9 +234,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             votedBy: winnerSummary.voters,
         };
         this.logger.log(`Giro de Selectora iniciado (60 segundos de suspenso y rotación). Ganador calculado: ${this.winningGame.name}`);
-        if (this.onSendMessageToChat) {
-            this.onSendMessageToChat('🛑 ¡Cola de juegos cerrada! Girando la Selectora en pantalla...');
-        }
         if (this.onBroadcastSpinStarted) {
             this.onBroadcastSpinStarted({
                 durationMs: 60000,
@@ -260,12 +251,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         if (this.winningGame) {
             this.previouslyWonGames.add(this.winningGame.name);
             this.saveConfig();
-            const votersText = this.winningGame.votedBy.length > 0 && this.winningGame.votedBy[0] !== 'Ruleta Automática'
-                ? ` (Votado por: ${this.winningGame.votedBy.slice(0, 4).map((v) => '@' + v).join(', ')}${this.winningGame.votedBy.length > 4 ? ` y ${this.winningGame.votedBy.length - 4} más` : ''})`
-                : '';
-            if (this.onSendMessageToChat) {
-                this.onSendMessageToChat(`🎉 ¡LA SELECTORA HA HABLADO! El juego ganador es: 🏆 ${this.winningGame.name} 🏆${votersText}. ¡A jugar!`);
-            }
         }
         this.broadcastCurrentState();
         this.lifecycleTimer = setTimeout(() => {
@@ -305,9 +290,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         const normInput = this.normalizeText(cleanInput);
         const wonMatch = Array.from(this.previouslyWonGames).find((wonName) => this.isSimilar(wonName, cleanInput));
         if (wonMatch) {
-            if (this.onSendMessageToChat) {
-                this.onSendMessageToChat(`@${lowerUser} Ese juego ya ganó hoy (${wonMatch}), ¡dale la oportunidad a otros títulos! 🎮🚫`);
-            }
             return { success: false, message: 'Juego ya ganado' };
         }
         if (normInput.startsWith('web') || normInput.startsWith('juegoweb') || normInput.startsWith('minijuego') || normInput.startsWith('navegador') || normInput.startsWith('io')) {
@@ -342,9 +324,6 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
                 return { success: true };
             }
             else {
-                if (this.onSendMessageToChat) {
-                    this.onSendMessageToChat(`@${lowerUser} Ese juego no está disponible por ahora 🚫`);
-                }
                 return { success: false };
             }
         }

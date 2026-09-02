@@ -123,6 +123,9 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`⏱️ Cooldown configurado a ${Math.round(this.cooldownMs / 1000)} segundos.`);
 
+    // Iniciar tarea periódica de auto-limpieza cada 1 minuto
+    this.startAutoCleanupTask();
+
     if (this.currentChannel.trim() !== '') {
       await this.connectToTwitch();
     } else {
@@ -132,7 +135,47 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private autoCleanupInterval: NodeJS.Timeout | null = null;
+
+  private startAutoCleanupTask() {
+    if (this.autoCleanupInterval) {
+      clearInterval(this.autoCleanupInterval);
+    }
+
+    this.autoCleanupInterval = setInterval(async () => {
+      const now = Date.now();
+
+      // 1. Limpieza de memoria de usuarios recientes (> 60 segundos)
+      for (const [user, timestamp] of this.recentSpinUsers.entries()) {
+        if (now - timestamp > 60000) {
+          this.recentSpinUsers.delete(user);
+        }
+      }
+
+      // 2. Liberación de racha anti-campeo si ha pasado más de 1 minuto de inactividad
+      if (this.lastSpinTimestamp > 0 && now - this.lastSpinTimestamp > 60000) {
+        this.lastConsecutiveUser = null;
+        this.consecutiveSpinsCount = 0;
+      }
+
+      // 3. Limpieza de mensajes del chat de Twitch para liberar carga
+      if (this.client && this.isAuthenticated && this.currentChannel.trim() !== '') {
+        try {
+          const cleanChan = this.currentChannel.replace(/^#/, '');
+          await this.client.say(cleanChan, '/clear');
+          this.logger.log(`🧹 [Auto-Limpieza Cada 1 Min]: Chat #${cleanChan} limpiado con /clear para liberar carga.`);
+        } catch (e) {
+          this.logger.debug(`ℹ️ Auto-limpieza en chat omitida o sin permisos de mod: ${e}`);
+        }
+      }
+    }, 60000);
+  }
+
   async onModuleDestroy() {
+    if (this.autoCleanupInterval) {
+      clearInterval(this.autoCleanupInterval);
+      this.autoCleanupInterval = null;
+    }
     await this.disconnectFromTwitch();
   }
 

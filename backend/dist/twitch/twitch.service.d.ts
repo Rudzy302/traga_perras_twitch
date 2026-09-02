@@ -39,6 +39,8 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     private readonly MAX_CONSECUTIVE_SPINS;
     constructor(casinoGateway: CasinoGateway, gamePickerService: GamePickerService);
     onModuleInit(): Promise<void>;
+    private autoCleanupInterval;
+    private startAutoCleanupTask;
     onModuleDestroy(): Promise<void>;
     private getCandidateFilePaths;
     saveConfigToDisk(data: {

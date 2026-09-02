@@ -208,9 +208,6 @@ export class GamePickerService {
     this.previouslyWonGames.clear();
     this.saveConfig();
     this.broadcastCurrentState();
-    if (this.onSendMessageToChat) {
-      this.onSendMessageToChat('🔄 El historial de juegos ganadores ha sido reseteado. ¡Todos los títulos vuelven a estar disponibles!');
-    }
   }
 
   public setTheme(theme: string) {
@@ -232,12 +229,6 @@ export class GamePickerService {
     this.votingState = 'VOTING';
 
     this.logger.log(`Votación de Selectora iniciada por ${this.duration} segundos.`);
-
-    // Mensaje de apertura en Twitch
-    if (this.onSendMessageToChat) {
-      this.onSendMessageToChat('🎮 ¡Votaciones disponibles! Usa el comando !juego y pon el nombre del juego que quieras que sea jugado.');
-    }
-
     this.broadcastCurrentState();
 
     // Cuenta regresiva de la votación
@@ -288,11 +279,6 @@ export class GamePickerService {
 
     this.logger.log(`Giro de Selectora iniciado (60 segundos de suspenso y rotación). Ganador calculado: ${this.winningGame.name}`);
 
-    // Mensaje de cierre en Twitch
-    if (this.onSendMessageToChat) {
-      this.onSendMessageToChat('🛑 ¡Cola de juegos cerrada! Girando la Selectora en pantalla...');
-    }
-
     // Emitir inicio de giro a OBS y Dashboard
     if (this.onBroadcastSpinStarted) {
       this.onBroadcastSpinStarted({
@@ -315,15 +301,6 @@ export class GamePickerService {
     if (this.winningGame) {
       this.previouslyWonGames.add(this.winningGame.name);
       this.saveConfig();
-
-      const votersText =
-        this.winningGame.votedBy.length > 0 && this.winningGame.votedBy[0] !== 'Ruleta Automática'
-          ? ` (Votado por: ${this.winningGame.votedBy.slice(0, 4).map((v) => '@' + v).join(', ')}${this.winningGame.votedBy.length > 4 ? ` y ${this.winningGame.votedBy.length - 4} más` : ''})`
-          : '';
-
-      if (this.onSendMessageToChat) {
-        this.onSendMessageToChat(`🎉 ¡LA SELECTORA HA HABLADO! El juego ganador es: 🏆 ${this.winningGame.name} 🏆${votersText}. ¡A jugar!`);
-      }
     }
 
     this.broadcastCurrentState();
@@ -379,9 +356,6 @@ export class GamePickerService {
     // 3. SISTEMA ANTI-REPETICIÓN: Verificar si ya ganó hoy
     const wonMatch = Array.from(this.previouslyWonGames).find((wonName) => this.isSimilar(wonName, cleanInput));
     if (wonMatch) {
-      if (this.onSendMessageToChat) {
-        this.onSendMessageToChat(`@${lowerUser} Ese juego ya ganó hoy (${wonMatch}), ¡dale la oportunidad a otros títulos! 🎮🚫`);
-      }
       return { success: false, message: 'Juego ya ganado' };
     }
 
@@ -423,9 +397,6 @@ export class GamePickerService {
         this.broadcastCurrentState();
         return { success: true };
       } else {
-        if (this.onSendMessageToChat) {
-          this.onSendMessageToChat(`@${lowerUser} Ese juego no está disponible por ahora 🚫`);
-        }
         return { success: false };
       }
     }

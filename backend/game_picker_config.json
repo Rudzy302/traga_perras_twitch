@@ -1,6 +1,24 @@
 {
   "customGames": [
     {
+      "id": "custom-1788370628834",
+      "name": "web",
+      "category": "Multiplataforma / Sandbox",
+      "platform": "PC / Directo",
+      "keywords": [
+        "web"
+      ]
+    },
+    {
+      "id": "custom-1788369676885",
+      "name": "web",
+      "category": "Juego Web / Navegador",
+      "platform": "PC / Directo",
+      "keywords": [
+        "web"
+      ]
+    },
+    {
       "id": "custom-1788364454105",
       "name": "R.E.P.O",
       "category": "Juego Personalizado",
@@ -19,7 +37,6 @@
       ]
     }
   ],
-  "deletedGameIds": [],
   "enabledGameIds": [
     "hollow-knight",
     "fnaf-2",

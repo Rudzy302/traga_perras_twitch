@@ -71,6 +71,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.lastConsecutiveUser = null;
         this.consecutiveSpinsCount = 0;
         this.MAX_CONSECUTIVE_SPINS = 2;
+        this.autoCleanupInterval = null;
         this.cooldownTimers = [];
     }
     async onModuleInit() {
@@ -87,6 +88,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.casinoGateway.emitGamePickerSpinStarted(payload);
         };
         this.logger.log(`⏱️ Cooldown configurado a ${Math.round(this.cooldownMs / 1000)} segundos.`);
+        this.startAutoCleanupTask();
         if (this.currentChannel.trim() !== '') {
             await this.connectToTwitch();
         }
@@ -94,7 +96,38 @@ let TwitchService = TwitchService_1 = class TwitchService {
             this.logger.warn('ℹ️ Aún no se ha configurado un canal de Twitch. Abre http://localhost:3000 para configurar tu canal.');
         }
     }
+    startAutoCleanupTask() {
+        if (this.autoCleanupInterval) {
+            clearInterval(this.autoCleanupInterval);
+        }
+        this.autoCleanupInterval = setInterval(async () => {
+            const now = Date.now();
+            for (const [user, timestamp] of this.recentSpinUsers.entries()) {
+                if (now - timestamp > 60000) {
+                    this.recentSpinUsers.delete(user);
+                }
+            }
+            if (this.lastSpinTimestamp > 0 && now - this.lastSpinTimestamp > 60000) {
+                this.lastConsecutiveUser = null;
+                this.consecutiveSpinsCount = 0;
+            }
+            if (this.client && this.isAuthenticated && this.currentChannel.trim() !== '') {
+                try {
+                    const cleanChan = this.currentChannel.replace(/^#/, '');
+                    await this.client.say(cleanChan, '/clear');
+                    this.logger.log(`🧹 [Auto-Limpieza Cada 1 Min]: Chat #${cleanChan} limpiado con /clear para liberar carga.`);
+                }
+                catch (e) {
+                    this.logger.debug(`ℹ️ Auto-limpieza en chat omitida o sin permisos de mod: ${e}`);
+                }
+            }
+        }, 60000);
+    }
     async onModuleDestroy() {
+        if (this.autoCleanupInterval) {
+            clearInterval(this.autoCleanupInterval);
+            this.autoCleanupInterval = null;
+        }
         await this.disconnectFromTwitch();
     }
     getCandidateFilePaths(fileName) {
