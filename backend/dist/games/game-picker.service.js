@@ -244,7 +244,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.broadcastCurrentState();
         this.lifecycleTimer = setTimeout(() => {
             this.shutdownSequence();
-        }, 10000);
+        }, 20000);
     }
     shutdownSequence() {
         this.logger.log('Selectora de Juegos apagada totalmente (modo silencio activo).');

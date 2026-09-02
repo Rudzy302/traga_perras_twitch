@@ -62,54 +62,6 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
 
   const viewportFrameRef = useRef<HTMLDivElement>(null);
   const reelContainerRef = useRef<HTMLDivElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-
-  // Helper para obtener AudioContext
-  const getAudioContext = () => {
-    try {
-      if (!audioContextRef.current) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) audioContextRef.current = new AudioCtx();
-      }
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume().catch(() => {});
-      }
-      return audioContextRef.current;
-    } catch {
-      return null;
-    }
-  };
-
-  // Sonido ÚNICO: Click mecánico puro de salto de casilla (sin tonos ni sintetizadores)
-  const playCardStepTick = () => {
-    try {
-      const ctx = getAudioContext();
-      if (!ctx) return;
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-
-      // Ruido percusivo de clic de tarjeta mecánico
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(520, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(75, ctx.currentTime + 0.022);
-
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1150, ctx.currentTime);
-      filter.Q.setValueAtTime(2.5, ctx.currentTime);
-
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.022);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.024);
-    } catch {}
-  };
 
   // Helper para construir la cinta de tarjetas garantizando al ganador en la posición exacta
   const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 150, winnerIdx = 120): VotedGameSummary[] => {
@@ -206,37 +158,11 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         setTargetOffset(finalOffset);
       }, 50);
 
-      // FÍSICA DE SONIDO: Ticks mecánicos de salto de casilla a lo largo de 20 segundos
-      const startTime = Date.now();
+      // Temporizador visual del giro cinético de 20 segundos
       const totalDuration = payload.durationMs || 20000;
-
-      const scheduleNextTick = () => {
-        const elapsed = Date.now() - startTime;
-        if (elapsed >= totalDuration) {
-          setIsSpinningLocal(false);
-          return;
-        }
-
-        const progress = elapsed / totalDuration; // 0.0 -> 1.0
-
-        playCardStepTick();
-
-        // Desaceleración progresiva de los saltos de casilla:
-        let nextDelay = 30;
-        if (progress < 0.35) {
-          nextDelay = 26 + progress * 60; // 0s - 7s: Híper velocidad
-        } else if (progress < 0.65) {
-          nextDelay = 48 + (progress - 0.35) * 320; // 7s - 13s: Frenada visible
-        } else if (progress < 0.88) {
-          nextDelay = 145 + (progress - 0.65) * 1100; // 13s - 17.6s: Salto de casilla audible y tenso
-        } else {
-          nextDelay = 380 + (progress - 0.88) * 4200; // 17.6s - 20s: Últimos saltos lentos hasta detenerse en el ganador
-        }
-
-        setTimeout(scheduleNextTick, nextDelay);
-      };
-
-      scheduleNextTick();
+      setTimeout(() => {
+        setIsSpinningLocal(false);
+      }, totalDuration);
     };
 
     socket.on('game-picker-state', handleStateChange);

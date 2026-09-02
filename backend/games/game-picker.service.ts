@@ -300,10 +300,10 @@ export class GamePickerService {
 
     this.broadcastCurrentState();
 
-    // Fase 4: Exactamente a los 10 segundos de mostrar el resultado, apagar la máquina totalmente y no recibir más comandos
+    // Fase 4: Exactamente a los 20 segundos de mostrar el resultado (tiempo duplicado), apagar la máquina totalmente
     this.lifecycleTimer = setTimeout(() => {
       this.shutdownSequence();
-    }, 10000);
+    }, 20000);
   }
 
   private shutdownSequence() {
