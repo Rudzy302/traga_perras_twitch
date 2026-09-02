@@ -57,7 +57,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   const [spinItems, setSpinItems] = useState<VotedGameSummary[]>([]);
   const [isSpinningLocal, setIsSpinningLocal] = useState<boolean>(false);
   const [targetOffset, setTargetOffset] = useState<number>(0);
-  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(280);
+  const [winnerCardIndex, setWinnerCardIndex] = useState<number | null>(null);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
   const [needleActive, setNeedleActive] = useState<boolean>(false);
 
@@ -114,7 +114,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   };
 
   // Helper para construir la cinta de tarjetas garantizando al ganador en la posición exacta
-  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 350, winnerIdx = 280): VotedGameSummary[] => {
+  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 500, winnerIdx = 485): VotedGameSummary[] => {
     const safePool: VotedGameSummary[] =
       pool && pool.length > 0
         ? pool
@@ -128,7 +128,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       list.push({ ...item });
     }
 
-    if (winner) {
+    if (winner && winnerIdx < totalCount) {
       list[winnerIdx] = {
         id: winner.id,
         name: winner.name,
@@ -145,21 +145,24 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   useEffect(() => {
     if (!socket) return;
 
-    const WINNER_INDEX = 280;
-    const TOTAL_CARDS = 350;
-
     // Pedir estado inicial
     socket.emit('get-game-picker-state', (state: GamePickerState) => {
       if (state) {
         setPickerState(state);
         if (state.votingState === 'WINNER' && state.winningGame) {
-          const list = buildReelItems(state.winningGame, state.votedGames, TOTAL_CARDS, WINNER_INDEX);
+          const totalCount = Math.max(500, 500 + (state.votedGames?.length || 0));
+          const winnerIndex = totalCount - 15;
+          const list = buildReelItems(state.winningGame, state.votedGames, totalCount, winnerIndex);
           setSpinItems(list);
-          setWinnerCardIndex(WINNER_INDEX);
+          setWinnerCardIndex(winnerIndex);
           const vpWidth = viewportFrameRef.current?.getBoundingClientRect().width || 700;
-          const offset = Math.round(WINNER_INDEX * 256 + 120 - vpWidth / 2);
+          const offset = Math.round(winnerIndex * 256 + 120 - vpWidth / 2);
           setTargetOffset(offset);
           setShowConfetti(true);
+        } else if (state.votingState === 'IDLE') {
+          setSpinItems([]);
+          setWinnerCardIndex(null);
+          setTargetOffset(0);
         }
       }
     });
@@ -171,11 +174,13 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         setIsSpinningLocal(false);
         setShowConfetti(true);
         if (state.winningGame) {
-          const list = buildReelItems(state.winningGame, state.votedGames, TOTAL_CARDS, WINNER_INDEX);
+          const totalCount = Math.max(500, 500 + (state.votedGames?.length || 0));
+          const winnerIndex = totalCount - 15;
+          const list = buildReelItems(state.winningGame, state.votedGames, totalCount, winnerIndex);
           setSpinItems(list);
-          setWinnerCardIndex(WINNER_INDEX);
+          setWinnerCardIndex(winnerIndex);
           const vpWidth = viewportFrameRef.current?.getBoundingClientRect().width || 700;
-          const offset = Math.round(WINNER_INDEX * 256 + 120 - vpWidth / 2);
+          const offset = Math.round(winnerIndex * 256 + 120 - vpWidth / 2);
           setTargetOffset(offset);
           if (reelContainerRef.current) {
             reelContainerRef.current.style.transition = 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
@@ -186,19 +191,35 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
         setShowConfetti(false);
         setIsSpinningLocal(false);
+        setSpinItems([]); // Limpiar y vaciar la cinta por completo
+        setWinnerCardIndex(null);
+        setTargetOffset(0);
+        if (reelContainerRef.current) {
+          reelContainerRef.current.style.transition = 'none';
+          reelContainerRef.current.style.transform = 'translateX(0px)';
+        }
       }
     };
 
-    const handleSpinStarted = (payload: { durationMs: number; votedPool: VotedGameSummary[]; winner: any }) => {
+    const handleSpinStarted = (payload: {
+      durationMs: number;
+      votedPool: VotedGameSummary[];
+      tapeItems?: any[];
+      winnerIndex?: number;
+      winner: any;
+    }) => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
 
       setIsSpinningLocal(true);
       setShowConfetti(false);
 
-      const winnerIdx = WINNER_INDEX;
-      setWinnerCardIndex(winnerIdx);
+      const list =
+        payload.tapeItems && payload.tapeItems.length > 0
+          ? payload.tapeItems
+          : buildReelItems(payload.winner, payload.votedPool, 500 + (payload.votedPool?.length || 0), 485);
 
-      const list = buildReelItems(payload.winner, payload.votedPool, TOTAL_CARDS, winnerIdx);
+      const winnerIdx = payload.winnerIndex !== undefined ? payload.winnerIndex : Math.max(0, list.length - 15);
+      setWinnerCardIndex(winnerIdx);
       setSpinItems(list);
 
       const vpWidth = viewportFrameRef.current?.getBoundingClientRect().width || 700;

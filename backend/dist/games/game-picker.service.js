@@ -234,6 +234,27 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.clearVotingTimer();
         this.startSpinSequence();
     }
+    generateTapeSequence(pool) {
+        const uniqueCount = pool.length;
+        const totalSlots = 500 + uniqueCount;
+        const winnerIndex = totalSlots - 15;
+        const tape = new Array(totalSlots);
+        const availableIndices = Array.from({ length: totalSlots }, (_, i) => i);
+        for (let i = availableIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [availableIndices[i], availableIndices[j]] = [availableIndices[j], availableIndices[i]];
+        }
+        const guaranteedSlots = availableIndices.slice(0, uniqueCount);
+        const remainingSlots = availableIndices.slice(uniqueCount);
+        for (let i = 0; i < uniqueCount; i++) {
+            tape[guaranteedSlots[i]] = pool[i];
+        }
+        for (const slotIndex of remainingSlots) {
+            tape[slotIndex] = this.pickWeightedWinner(pool);
+        }
+        const winner = tape[winnerIndex];
+        return { tape, winnerIndex, winner };
+    }
     startSpinSequence() {
         this.votingState = 'SPINNING';
         const votedSummaries = this.getVotedSummaries();
@@ -249,18 +270,27 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
                 voters: ['Ruleta Automática'],
             }));
         }
-        const winnerSummary = this.pickWeightedWinner(poolToSpin);
+        const { tape, winnerIndex, winner } = this.generateTapeSequence(poolToSpin);
         this.winningGame = {
-            id: winnerSummary.id,
-            name: winnerSummary.name,
-            category: winnerSummary.category,
-            votedBy: winnerSummary.voters,
+            id: winner.id,
+            name: winner.name,
+            category: winner.category,
+            votedBy: winner.voters,
         };
-        this.logger.log(`Giro de Selectora iniciado (60 segundos de suspenso y rotación). Ganador calculado: ${this.winningGame.name}`);
+        this.logger.log(`Giro de Selectora iniciado (${tape.length} casillas totales: 500 base + ${poolToSpin.length} juegos únicos). Ganador en casilla ${winnerIndex}: ${this.winningGame.name}`);
         if (this.onBroadcastSpinStarted) {
             this.onBroadcastSpinStarted({
                 durationMs: 60000,
                 votedPool: poolToSpin,
+                tapeItems: tape.map((item, idx) => ({
+                    uniqueKey: `${item.id}-${idx}`,
+                    id: item.id,
+                    name: item.name,
+                    category: item.category,
+                    voters: item.voters,
+                    votesCount: item.votesCount,
+                })),
+                winnerIndex,
                 winner: this.winningGame,
             });
         }
@@ -281,9 +311,10 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         }, 30000);
     }
     shutdownSequence() {
-        this.logger.log('Selectora de Juegos apagada totalmente (modo silencio activo).');
+        this.logger.log('Selectora de Juegos: Limpiando cinta y apagando totalmente.');
         this.votingState = 'IDLE';
         this.activeVotes.clear();
+        this.winningGame = null;
         this.timeRemaining = 0;
         this.broadcastCurrentState();
     }

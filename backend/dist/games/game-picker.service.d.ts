@@ -75,6 +75,7 @@ export declare class GamePickerService {
     setTheme(theme: string): void;
     startVoting(durationSeconds?: number): void;
     stopVotingManual(): void;
+    private generateTapeSequence;
     private startSpinSequence;
     private announceWinnerSequence;
     private shutdownSequence;

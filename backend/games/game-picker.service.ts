@@ -270,6 +270,44 @@ export class GamePickerService {
     this.startSpinSequence();
   }
 
+  private generateTapeSequence(pool: VotedGameSummary[]): {
+    tape: VotedGameSummary[];
+    winnerIndex: number;
+    winner: VotedGameSummary;
+  } {
+    const uniqueCount = pool.length;
+    // Capacidad: 500 casillas base de sobra + Cantidad de Juegos Únicos Postulados
+    const totalSlots = 500 + uniqueCount;
+    const winnerIndex = totalSlots - 15; // 15 casillas de margen final tras el ganador
+
+    const tape: VotedGameSummary[] = new Array(totalSlots);
+
+    // 1. Garantía Mínima: Asignar 1 casilla asegurada a cada juego postulado único
+    const availableIndices = Array.from({ length: totalSlots }, (_, i) => i);
+    // Barajar índices aleatoriamente (Fisher-Yates)
+    for (let i = availableIndices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [availableIndices[i], availableIndices[j]] = [availableIndices[j], availableIndices[i]];
+    }
+
+    const guaranteedSlots = availableIndices.slice(0, uniqueCount);
+    const remainingSlots = availableIndices.slice(uniqueCount);
+
+    for (let i = 0; i < uniqueCount; i++) {
+      tape[guaranteedSlots[i]] = pool[i];
+    }
+
+    // 2. Rellenar las 500 casillas restantes por probabilidad pura proporcional a votos
+    for (const slotIndex of remainingSlots) {
+      tape[slotIndex] = this.pickWeightedWinner(pool);
+    }
+
+    // 3. El ganador legítimo es el juego que quedó en la casilla winnerIndex por puro azar
+    const winner = tape[winnerIndex];
+
+    return { tape, winnerIndex, winner };
+  }
+
   private startSpinSequence() {
     this.votingState = 'SPINNING';
     const votedSummaries = this.getVotedSummaries();
@@ -288,22 +326,32 @@ export class GamePickerService {
       }));
     }
 
-    // Selección ponderada del ganador
-    const winnerSummary = this.pickWeightedWinner(poolToSpin);
+    // Generar la cinta de 500 + N casillas con garantía y probabilidad por votos
+    const { tape, winnerIndex, winner } = this.generateTapeSequence(poolToSpin);
+
     this.winningGame = {
-      id: winnerSummary.id,
-      name: winnerSummary.name,
-      category: winnerSummary.category,
-      votedBy: winnerSummary.voters,
+      id: winner.id,
+      name: winner.name,
+      category: winner.category,
+      votedBy: winner.voters,
     };
 
-    this.logger.log(`Giro de Selectora iniciado (60 segundos de suspenso y rotación). Ganador calculado: ${this.winningGame.name}`);
+    this.logger.log(`Giro de Selectora iniciado (${tape.length} casillas totales: 500 base + ${poolToSpin.length} juegos únicos). Ganador en casilla ${winnerIndex}: ${this.winningGame.name}`);
 
-    // Emitir inicio de giro a OBS y Dashboard
+    // Emitir inicio de giro a OBS y Dashboard con la cinta completa
     if (this.onBroadcastSpinStarted) {
       this.onBroadcastSpinStarted({
         durationMs: 60000,
         votedPool: poolToSpin,
+        tapeItems: tape.map((item, idx) => ({
+          uniqueKey: `${item.id}-${idx}`,
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          voters: item.voters,
+          votesCount: item.votesCount,
+        })),
+        winnerIndex,
         winner: this.winningGame,
       });
     }
@@ -325,16 +373,17 @@ export class GamePickerService {
 
     this.broadcastCurrentState();
 
-    // Fase 4: Exactamente a los 30 segundos de mostrar el resultado, apagar la máquina totalmente
+    // Fase 4: Exactamente a los 30 segundos de mostrar el resultado, limpiar cinta y apagar totalmente
     this.lifecycleTimer = setTimeout(() => {
       this.shutdownSequence();
     }, 30000);
   }
 
   private shutdownSequence() {
-    this.logger.log('Selectora de Juegos apagada totalmente (modo silencio activo).');
+    this.logger.log('Selectora de Juegos: Limpiando cinta y apagando totalmente.');
     this.votingState = 'IDLE';
     this.activeVotes.clear();
+    this.winningGame = null;
     this.timeRemaining = 0;
     this.broadcastCurrentState();
   }
