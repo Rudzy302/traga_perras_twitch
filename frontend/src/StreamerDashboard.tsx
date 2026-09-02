@@ -1631,14 +1631,22 @@ export const StreamerDashboard: React.FC = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Categoría / Tipo:</label>
-                      <input
-                        type="text"
-                        placeholder="Ej: Terror Cooperativo, Especial Stream..."
-                        value={customGameCategory}
+                      <label>Tipo / Categoría de Título:</label>
+                      <select
+                        value={customGameCategory || 'Juego Específico / PC / Consola'}
                         onChange={(e) => setCustomGameCategory(e.target.value)}
-                        className="gp-input-text"
-                      />
+                        className="gp-input-select"
+                      >
+                        <option value="Juego Específico / PC / Consola">🎮 Juego Específico / PC / Consola (ej: Hollow Knight, Dark Souls, Undertale)</option>
+                        <option value="Juego Web / Navegador">🌐 Juego Web / Navegador (ej: Gartic Phone, Skribbl.io, Geoguessr, Wordle)</option>
+                        <option value="Multiplataforma / Sandbox">🌐 Multiplataforma / Sandbox (ej: Roblox, Fortnite, Minecraft, Fall Guys)</option>
+                        <option value="Retro / Emulador">🕹️ Retro / Emulador (ej: Super Mario 64, Crash Bandicoot, Zelda)</option>
+                        <option value="Minijuego / Casual">🎲 Minijuego / Casual (ej: Papa's Pizzeria, Slither.io, Krunker)</option>
+                        <option value="Especial Stream / Comunidad">✨ Especial Stream / Comunidad (ej: Charlas, Retos, Reacciones)</option>
+                      </select>
+                      <p className="form-help-text">
+                        El bot y la Selectora sabrán cómo clasificarlo y los viewers podrán votar con <b>!juego &lt;nombre&gt;</b> o <b>!juego web &lt;nombre&gt;</b>.
+                      </p>
                     </div>
                     <div className="modal-actions-row">
                       <button

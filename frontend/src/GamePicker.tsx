@@ -156,7 +156,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
           const list = buildReelItems(state.winningGame, state.votedGames, TOTAL_CARDS, WINNER_INDEX);
           setSpinItems(list);
           setWinnerCardIndex(WINNER_INDEX);
-          const vpWidth = viewportFrameRef.current?.clientWidth || 700;
+          const vpWidth = viewportFrameRef.current?.getBoundingClientRect().width || 700;
           const offset = Math.round(WINNER_INDEX * 256 + 120 - vpWidth / 2);
           setTargetOffset(offset);
           setShowConfetti(true);
@@ -174,10 +174,11 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
           const list = buildReelItems(state.winningGame, state.votedGames, TOTAL_CARDS, WINNER_INDEX);
           setSpinItems(list);
           setWinnerCardIndex(WINNER_INDEX);
-          const vpWidth = viewportFrameRef.current?.clientWidth || 700;
+          const vpWidth = viewportFrameRef.current?.getBoundingClientRect().width || 700;
           const offset = Math.round(WINNER_INDEX * 256 + 120 - vpWidth / 2);
           setTargetOffset(offset);
           if (reelContainerRef.current) {
+            reelContainerRef.current.style.transition = 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
             reelContainerRef.current.style.transform = `translateX(-${offset}px)`;
           }
         }

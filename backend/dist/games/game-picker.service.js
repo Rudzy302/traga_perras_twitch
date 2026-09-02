@@ -284,6 +284,20 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             }
             return { success: false, message: 'Juego ya ganado' };
         }
+        if (normInput.startsWith('web') || normInput.startsWith('juegoweb') || normInput.startsWith('minijuego') || normInput.startsWith('navegador') || normInput.startsWith('io')) {
+            let webName = cleanInput.replace(/^(web|juego\s*web|minijuego|navegador|io)\s*[:\-]?\s*/i, '').trim();
+            if (webName.length > 0) {
+                this.activeVotes.set(lowerUser, {
+                    username: lowerUser,
+                    gameId: `web-${this.normalizeText(webName)}`,
+                    gameName: `🌐 Web: ${webName}`,
+                    rawInput: cleanInput,
+                    timestamp: Date.now(),
+                });
+                this.broadcastCurrentState();
+                return { success: true };
+            }
+        }
         if (normInput.startsWith('roblox') || normInput.startsWith('fortnite') || normInput.startsWith('fornite') || normInput.startsWith('roblx')) {
             const isRoblox = normInput.includes('robl');
             const baseId = isRoblox ? 'roblox' : 'fortnite';
