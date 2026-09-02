@@ -57,61 +57,139 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   const [spinItems, setSpinItems] = useState<VotedGameSummary[]>([]);
   const [isSpinningLocal, setIsSpinningLocal] = useState<boolean>(false);
   const [targetOffset, setTargetOffset] = useState<number>(0);
-  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(200);
+  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(50);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
 
+  const viewportFrameRef = useRef<HTMLDivElement>(null);
   const reelContainerRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // Sonido mecánico puro y limpio de salto de casilla (Click seco de ruleta)
-  const playCardStepSound = () => {
+  // Helper para obtener AudioContext
+  const getAudioContext = () => {
     try {
       if (!audioContextRef.current) {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) audioContextRef.current = new AudioCtx();
       }
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
+        audioContextRef.current.resume().catch(() => {});
       }
-      if (audioContextRef.current) {
-        const ctx = audioContextRef.current;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
+      return audioContextRef.current;
+    } catch {
+      return null;
+    }
+  };
 
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1400, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.016);
+  // Sonido de clic mecánico auténtico (Salto de casilla con impacto táctil)
+  const playMechanicalTick = (pitchMultiplier = 1.0) => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
 
-        filter.type = 'highpass';
-        filter.frequency.setValueAtTime(450, ctx.currentTime);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.016);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(420 * pitchMultiplier, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(70 * pitchMultiplier, ctx.currentTime + 0.045);
 
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.045);
 
-        osc.start();
-        osc.stop(ctx.currentTime + 0.016);
-      }
-    } catch (_) {}
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.048);
+    } catch {}
+  };
+
+  // Sonido de freno / parada en seco sobre la casilla ganadora
+  const playHardStopSound = () => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.35);
+
+      gain.gain.setValueAtTime(0.85, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.36);
+    } catch {}
+  };
+
+  // Helper para construir la cinta de tarjetas garantizando al ganador en la posición exacta
+  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 80, winnerIdx = 50): VotedGameSummary[] => {
+    const safePool: VotedGameSummary[] =
+      pool && pool.length > 0
+        ? pool
+        : winner
+        ? [{ id: winner.id, name: winner.name, category: winner.category || 'Juego Sugerido', votesCount: 1, voters: winner.votedBy || [] }]
+        : [{ id: 'default', name: 'Juego Sorpresa', category: 'Aleatorio', votesCount: 1, voters: [] }];
+
+    const list: VotedGameSummary[] = [];
+    for (let i = 0; i < totalCount; i++) {
+      const item = safePool[i % safePool.length];
+      list.push({ ...item });
+    }
+
+    if (winner) {
+      list[winnerIdx] = {
+        id: winner.id,
+        name: winner.name,
+        category: winner.category || 'Juego Ganador',
+        votesCount: 1,
+        voters: winner.votedBy || [],
+      };
+    }
+
+    return list;
   };
 
   // Escuchar eventos de WebSockets
   useEffect(() => {
     if (!socket) return;
 
+    const WINNER_INDEX = 50;
+
     // Pedir estado inicial
     socket.emit('get-game-picker-state', (state: GamePickerState) => {
-      if (state) setPickerState(state);
+      if (state) {
+        setPickerState(state);
+        if (state.votingState === 'WINNER' && state.winningGame) {
+          const list = buildReelItems(state.winningGame, state.votedGames, 80, WINNER_INDEX);
+          setSpinItems(list);
+          setWinnerCardIndex(WINNER_INDEX);
+          const vpWidth = viewportFrameRef.current?.clientWidth || 700;
+          const offset = WINNER_INDEX * 256 + 120 - vpWidth / 2;
+          setTargetOffset(offset);
+          setShowConfetti(true);
+        }
+      }
     });
 
     const handleStateChange = (state: GamePickerState) => {
       setPickerState(state);
       if (state.votingState === 'WINNER') {
         setShowConfetti(true);
+        if (state.winningGame) {
+          const list = buildReelItems(state.winningGame, state.votedGames, 80, WINNER_INDEX);
+          setSpinItems(list);
+          setWinnerCardIndex(WINNER_INDEX);
+          const vpWidth = viewportFrameRef.current?.clientWidth || 700;
+          const offset = WINNER_INDEX * 256 + 120 - vpWidth / 2;
+          setTargetOffset(offset);
+        }
       } else if (state.votingState === 'IDLE') {
         setShowConfetti(false);
         setIsSpinningLocal(false);
@@ -122,39 +200,18 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       setIsSpinningLocal(true);
       setShowConfetti(false);
 
-      // Generar una cinta ultra-larga (240 tarjetas) para dar una rotación intensa y prolongada de 15 segundos
-      const pool = payload.votedPool && payload.votedPool.length > 0
-        ? payload.votedPool
-        : [{ id: 'default', name: 'Juego Sorpresa', category: 'Aleatorio', votesCount: 1, voters: [] }];
-      const winningGame = payload.winner;
+      const winnerIdx = WINNER_INDEX;
+      setWinnerCardIndex(winnerIdx);
 
-      const totalCards = 240;
-      const targetWinner = 200;
-      setWinnerCardIndex(targetWinner);
+      const list = buildReelItems(payload.winner, payload.votedPool, 80, winnerIdx);
+      setSpinItems(list);
 
-      const repeatedList: VotedGameSummary[] = [];
-      for (let i = 0; i < totalCards; i++) {
-        const randomItem = pool[Math.floor(Math.random() * pool.length)];
-        repeatedList.push({ ...randomItem });
-      }
-
-      if (winningGame) {
-        repeatedList[targetWinner] = {
-          id: winningGame.id,
-          name: winningGame.name,
-          category: winningGame.category || 'Juego Elegido',
-          votesCount: 1,
-          voters: winningGame.votedBy || [],
-        };
-      }
-
-      setSpinItems(repeatedList);
-
-      // Calcular el desplazamiento en píxeles (ancho 240px + gap 16px = 256px por item)
-      // Ajuste al centro exacto del viewport
-      const itemWidth = 256;
-      const viewportWidth = reelContainerRef.current?.parentElement?.clientWidth || 700;
-      const finalOffset = targetWinner * itemWidth - (viewportWidth / 2 - itemWidth / 2);
+      // Calcular el desplazamiento en píxeles
+      // Ancho de tarjeta 240px + gap 16px = 256px por paso
+      // Centro de tarjeta = winnerIdx * 256 + 120px
+      // Para alinear con centro de viewport (vpWidth / 2): offset = centerCard - vpWidth/2
+      const vpWidth = viewportFrameRef.current?.clientWidth || 700;
+      const finalOffset = winnerIdx * 256 + 120 - vpWidth / 2;
 
       // Resetear posición primero
       setTargetOffset(0);
@@ -164,17 +221,22 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         setTargetOffset(finalOffset);
       }, 50);
 
-      // FÍSICA DE SONIDO: Desaceleración realista de salto de casilla a lo largo de 15 segundos
+      // FÍSICA DE SONIDO: Ticks mecánicos a lo largo de 15 segundos
       const startTime = Date.now();
       const totalDuration = payload.durationMs || 15000;
 
       const scheduleNextTick = () => {
         const elapsed = Date.now() - startTime;
-        if (elapsed >= totalDuration) return;
+        if (elapsed >= totalDuration) {
+          playHardStopSound();
+          return;
+        }
 
         const progress = elapsed / totalDuration; // 0.0 -> 1.0
 
-        playCardStepSound();
+        // Tono desciende levemente con la inercia (1.3 -> 0.75)
+        const pitch = 1.3 - progress * 0.55;
+        playMechanicalTick(pitch);
 
         // Desaceleración progresiva de los saltos de casilla:
         let nextDelay = 30;
@@ -265,7 +327,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         </div>
 
         {/* VISOR HORIZONTAL DEL CARRUSEL */}
-        <div className="gp-viewport-frame">
+        <div ref={viewportFrameRef} className="gp-viewport-frame">
           {/* Mira central de selección */}
           <div className="gp-center-pointer top-pointer">▼</div>
           <div className="gp-center-pointer bottom-pointer">▲</div>
