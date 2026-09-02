@@ -200,54 +200,74 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       const list = buildReelItems(payload.winner, payload.votedPool, TOTAL_CARDS, winnerIdx);
       setSpinItems(list);
 
-      const vpWidth = viewportFrameRef.current?.clientWidth || 700;
-      const finalOffset = Math.round(winnerIdx * 256 + 120 - vpWidth / 2);
-      setTargetOffset(finalOffset);
+      const vpWidth = viewportFrameRef.current?.getBoundingClientRect().width || 700;
+      const exactFinalOffset = Math.round(winnerIdx * 256 + 120 - vpWidth / 2);
+      setTargetOffset(exactFinalOffset);
 
       // Resetear posición
       if (reelContainerRef.current) {
+        reelContainerRef.current.style.transition = 'none';
         reelContainerRef.current.style.transform = 'translateX(0px)';
       }
 
-      // FÍSICA Y SINCRONIZACIÓN EXACTA CUADRO A CUADRO (100% Precisión Casilla-Sonido)
+      // FÍSICA Y SINCRONIZACIÓN EXACTA EN EL BORDE IZQUIERDO DE CADA CASILLA
       const startTime = performance.now();
-      const duration = payload.durationMs || 60000;
-      let lastTriggeredCard = 0;
+      const totalDuration = payload.durationMs || 60000;
+      const spinDuration = totalDuration - 800; // 59.2s de giro + 0.8s de rebote magnético al centro
 
-      // Curva física de inercia: Gran velocidad inicial y desaceleración natural
+      const needleCenterScreenX = vpWidth / 2;
+      // Inicializar con la casilla que ya está presente bajo la aguja en offset 0 para evitar falsos golpes al arrancar
+      let lastTriggeredCard = Math.floor(needleCenterScreenX / 256);
+
+      // Curva física de desaceleración gradual
       const getWheelEase = (t: number): number => {
-        return 1 - Math.pow(1 - t, 4.5);
+        return 1 - Math.pow(1 - t, 4.2);
       };
 
       const animateWheel = (now: number) => {
         const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const easedProgress = getWheelEase(progress);
-        const currentOffset = easedProgress * finalOffset;
 
-        if (reelContainerRef.current) {
-          reelContainerRef.current.style.transform = `translateX(-${currentOffset}px)`;
-        }
+        if (elapsed < spinDuration) {
+          const progress = elapsed / spinDuration;
+          const easedProgress = getWheelEase(progress);
+          // Permitir una leve inercia hacia adelante antes del rebote al centro exacto
+          const currentOffset = easedProgress * (exactFinalOffset + 35);
 
-        // Medir el paso físico exacto de cada casilla bajo la mira central
-        const currentVpWidth = viewportFrameRef.current?.clientWidth || 700;
-        const needleXOnStrip = currentOffset + currentVpWidth / 2;
-        const currentCard = Math.floor(needleXOnStrip / 256);
+          if (reelContainerRef.current) {
+            reelContainerRef.current.style.transition = 'none';
+            reelContainerRef.current.style.transform = `translateX(-${currentOffset}px)`;
+          }
 
-        if (currentCard > lastTriggeredCard) {
-          lastTriggeredCard = currentCard;
-          playNeedleTick();
-          setNeedleActive(true);
-          setTimeout(() => setNeedleActive(false), 45);
-        }
+          // Medir el paso físico exacto del borde izquierdo de cada casilla
+          // (Cada casilla K empieza en K * 256px y su borde izquierdo choca con la aguja en currentOffset + needleCenterScreenX >= K * 256)
+          const currentVpW = viewportFrameRef.current?.getBoundingClientRect().width || vpWidth;
+          const currentNeedleX = currentVpW / 2;
+          const needleXOnStrip = currentOffset + currentNeedleX;
+          const currentCardLeftEdge = Math.floor(needleXOnStrip / 256);
 
-        if (progress < 1) {
+          if (currentCardLeftEdge > lastTriggeredCard) {
+            lastTriggeredCard = currentCardLeftEdge;
+            playNeedleTick();
+            setNeedleActive(true);
+            setTimeout(() => setNeedleActive(false), 40);
+          }
+
           animFrameRef.current = requestAnimationFrame(animateWheel);
         } else {
-          setIsSpinningLocal(false);
+          // FASE DE REBOTE MAGNÉTICO AL CENTRO EXACTO
+          playNeedleTick();
+          setNeedleActive(true);
+          setTimeout(() => setNeedleActive(false), 120);
+
           if (reelContainerRef.current) {
-            reelContainerRef.current.style.transform = `translateX(-${finalOffset}px)`;
+            // Rebote elástico que clava la casilla ganadora en todo el centro
+            reelContainerRef.current.style.transition = 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            reelContainerRef.current.style.transform = `translateX(-${exactFinalOffset}px)`;
           }
+
+          setTimeout(() => {
+            setIsSpinningLocal(false);
+          }, 800);
         }
       };
 
