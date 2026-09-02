@@ -12,14 +12,15 @@ export interface StartSpinPayload {
 
 export type SlotTheme =
   | 'carnival-green'
+  | 'halloween-spooky'
+  | 'christmas-fest'
   | 'gold-classic'
   | 'cyber-neon'
   | 'inferno-flame'
   | 'ice-frost'
   | 'vaporwave-sunset'
   | 'steampunk-brass'
-  | 'galactic-void'
-  | 'halloween-spooky';
+  | 'galactic-void';
 
 export interface ThemeMeta {
   id: SlotTheme;
@@ -43,12 +44,21 @@ export const THEMES_LIST: ThemeMeta[] = [
   },
   {
     id: 'halloween-spooky',
-    name: 'Halloween Spooky 🎃',
-    subtitle: 'Calabazas ardientes, niebla espectral púrpura y verde ectoplasma',
+    name: 'Halloween Terror 🎃',
+    subtitle: 'Negro abisal, verde slime radioactivo fosforescente y fuego de calabaza',
     icon: '🎃',
-    headerIcon: '🎃',
-    colorPreview: 'linear-gradient(135deg, #180928, #ff6600 50%, #00ff66)',
-    tag: 'ESPECIAL OCTUBRE',
+    headerIcon: '🦇',
+    colorPreview: 'linear-gradient(135deg, #030008, #39ff14 45%, #ff5500 80%, #000000)',
+    tag: 'OCTUBRE TERROR',
+  },
+  {
+    id: 'christmas-fest',
+    name: 'Navidad Mágica 🎄',
+    subtitle: 'Rojo terciopelo navideño, bastón de caramelo, nieve blanca y oro festivo',
+    icon: '🎅',
+    headerIcon: '🎄',
+    colorPreview: 'linear-gradient(135deg, #8b0000, #00873e 40%, #ffffff 75%, #ffd700)',
+    tag: 'DICIEMBRE NAVIDAD',
   },
   {
     id: 'gold-classic',
