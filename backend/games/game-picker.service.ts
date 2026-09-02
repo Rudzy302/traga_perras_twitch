@@ -414,7 +414,13 @@ export class GamePickerService {
       return { success: false };
     }
 
-    // 2. FILTRO ANTI-SPAM SILENCIOSO: Textos sin sentido o muy cortos
+    // 2. REGLA ESTRICTA: 1 Solo Voto por Persona/Cuenta de Twitch en cada ronda
+    if (this.activeVotes.has(lowerUser)) {
+      this.logger.debug(`🚫 Voto duplicado ignorado de @${lowerUser}: ya tiene un voto registrado en esta ronda.`);
+      return { success: false, message: 'Solo se permite un voto por persona' };
+    }
+
+    // 3. FILTRO ANTI-SPAM SILENCIOSO: Textos sin sentido o muy cortos
     if (cleanInput.length < 2 || this.isGibberish(cleanInput)) {
       this.logger.debug(`Spam sin sentido ignorado de @${lowerUser}: "${cleanInput}"`);
       return { success: false };
