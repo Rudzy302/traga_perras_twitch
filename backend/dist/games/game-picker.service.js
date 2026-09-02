@@ -390,6 +390,15 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
     }
     getState() {
         const summaries = this.getVotedSummaries();
+        const all = this.getAllCatalogGames();
+        const enabledGamesList = all
+            .filter((g) => this.enabledGameIds.has(g.id))
+            .map((g) => ({
+            id: g.id,
+            name: g.name,
+            category: g.category,
+            platform: g.platform,
+        }));
         return {
             votingState: this.votingState,
             duration: this.duration,
@@ -398,6 +407,7 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
             votedGames: summaries,
             previouslyWonGames: Array.from(this.previouslyWonGames),
             enabledGameIds: Array.from(this.enabledGameIds),
+            enabledGames: enabledGamesList,
             winningGame: this.winningGame,
             activeTheme: this.activeTheme,
         };

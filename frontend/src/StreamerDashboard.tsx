@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import SlotMachine, { SlotTheme, THEMES_LIST } from './SlotMachine';
 import { GamePicker, GamePickerState, GAME_PICKER_THEMES } from './GamePicker';
@@ -76,6 +76,7 @@ export const StreamerDashboard: React.FC = () => {
     votedGames: [],
     previouslyWonGames: [],
     enabledGameIds: [],
+    enabledGames: [],
     winningGame: null,
     activeTheme: 'cyber-arcade',
   });
@@ -87,11 +88,37 @@ export const StreamerDashboard: React.FC = () => {
     page: 1,
     totalPages: 1,
   });
+
+  // Estado de Búsqueda y Paginación para Juegos Habilitados (Panel Derecho)
+  const [enabledQuery, setEnabledQuery] = useState<string>('');
+  const [enabledPage, setEnabledPage] = useState<number>(1);
+
   const [selectedPickerDuration, setSelectedPickerDuration] = useState<number>(120);
   const [customGameName, setCustomGameName] = useState<string>('');
   const [customGameCategory, setCustomGameCategory] = useState<string>('');
   const [showAddCustomModal, setShowAddCustomModal] = useState<boolean>(false);
   const [copiedPickerObsUrl, setCopiedPickerObsUrl] = useState<boolean>(false);
+
+  // Cálculo de Juegos Habilitados Filtrados y Paginados (10 en 10)
+  const filteredEnabledGames = useMemo(() => {
+    const list = gamePickerState?.enabledGames || [];
+    if (!enabledQuery.trim()) return list;
+    const q = enabledQuery.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return list.filter((g) => {
+      const n = (g.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const c = (g.category || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const p = (g.platform || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return n.includes(q) || c.includes(q) || p.includes(q);
+    });
+  }, [gamePickerState?.enabledGames, enabledQuery]);
+
+  const enabledPageSize = 10;
+  const totalEnabledPages = Math.max(1, Math.ceil(filteredEnabledGames.length / enabledPageSize));
+  const safeEnabledPage = Math.min(Math.max(1, enabledPage), totalEnabledPages);
+  const paginatedEnabledGames = filteredEnabledGames.slice(
+    (safeEnabledPage - 1) * enabledPageSize,
+    safeEnabledPage * enabledPageSize,
+  );
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -1445,38 +1472,106 @@ export const StreamerDashboard: React.FC = () => {
                     </p>
                   </div>
                   <span className="badge-enabled-count">
-                    {gamePickerState?.enabledGameIds.length || 0} activos
+                    {filteredEnabledGames.length} activos
                   </span>
                 </div>
 
-                <div className="gp-enabled-cards-scroll">
-                  {(!gamePickerState?.enabledGameIds || gamePickerState.enabledGameIds.length === 0) ? (
-                    <div className="gp-no-enabled-hint">
-                      <span>⚠️ No has habilitado ningún juego todavía. Usa el panel izquierdo para habilitar juegos.</span>
+                {/* Buscador Rápido en Juegos Habilitados */}
+                <form
+                  className="gp-search-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setEnabledPage(1);
+                  }}
+                >
+                  <div className="gp-search-input-wrap">
+                    <span className="search-icon">🔎</span>
+                    <input
+                      type="text"
+                      placeholder="Buscar en juegos habilitados (ej: Minecraft, Roblox, Terror...)"
+                      value={enabledQuery}
+                      onChange={(e) => {
+                        setEnabledQuery(e.target.value);
+                        setEnabledPage(1);
+                      }}
+                      className="gp-search-input"
+                    />
+                    {enabledQuery && (
+                      <button
+                        type="button"
+                        className="btn-clear-search"
+                        onClick={() => {
+                          setEnabledQuery('');
+                          setEnabledPage(1);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {/* Lista Paginada de 10 en 10 para Juegos Habilitados */}
+                <div className="gp-catalog-list-wrap">
+                  {filteredEnabledGames.length === 0 ? (
+                    <div className="gp-catalog-empty">
+                      {enabledQuery ? (
+                        <span>❌ No se encontraron juegos habilitados con ese nombre.</span>
+                      ) : (
+                        <span>⚠️ No has habilitado ningún juego todavía. Usa el panel izquierdo para habilitar juegos.</span>
+                      )}
                     </div>
                   ) : (
-                    <div className="gp-enabled-grid">
-                      {gamePickerState.enabledGameIds.map((id) => {
-                        const found = catalogData.games.find((g) => g.id === id);
-                        return (
-                          <div key={id} className="gp-enabled-card">
-                            <div className="gp-card-left">
-                              <span className="gp-enabled-icon">🎯</span>
-                              <span className="gp-enabled-name">{found ? found.name : id}</span>
+                    <div className="gp-catalog-table">
+                      {paginatedEnabledGames.map((game) => (
+                        <div key={game.id} className="gp-catalog-row row-enabled">
+                          <div className="gp-row-info">
+                            <span className="gp-game-icon">🎯</span>
+                            <div className="gp-game-meta">
+                              <span className="gp-row-name">{game.name}</span>
+                              <span className="gp-row-cat">{game.category} • {game.platform || 'PC / Consolas'}</span>
                             </div>
+                          </div>
+
+                          <div className="gp-row-action">
                             <button
                               type="button"
-                              className="btn-remove-enabled"
-                              onClick={() => handleDisableGame(id)}
-                              title="Quitar juego"
+                              className="btn-disable-game"
+                              onClick={() => handleDisableGame(game.id)}
+                              title="Quitar juego del directo"
                             >
-                              ✕
+                              ✕ Quitar
                             </button>
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   )}
+                </div>
+
+                {/* Paginación Limpia 10 en 10 para Juegos Habilitados */}
+                <div className="gp-pagination-controls">
+                  <button
+                    type="button"
+                    className="btn-page-nav"
+                    disabled={safeEnabledPage <= 1}
+                    onClick={() => setEnabledPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    ◀ Anterior
+                  </button>
+
+                  <span className="gp-page-indicator">
+                    Página <b>{safeEnabledPage}</b> de <b>{totalEnabledPages}</b> ({filteredEnabledGames.length} juegos activos)
+                  </span>
+
+                  <button
+                    type="button"
+                    className="btn-page-nav"
+                    disabled={safeEnabledPage >= totalEnabledPages}
+                    onClick={() => setEnabledPage((prev) => Math.min(totalEnabledPages, prev + 1))}
+                  >
+                    Siguiente ▶
+                  </button>
                 </div>
 
                 {/* Subtarjeta: Historial de Ganadores (Anti-Repetición) */}

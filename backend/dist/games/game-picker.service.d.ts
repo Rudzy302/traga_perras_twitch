@@ -14,6 +14,12 @@ export interface GamePickerState {
     votedGames: VotedGameSummary[];
     previouslyWonGames: string[];
     enabledGameIds: string[];
+    enabledGames: {
+        id: string;
+        name: string;
+        category: string;
+        platform?: string;
+    }[];
     winningGame: {
         id: string;
         name: string;

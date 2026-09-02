@@ -1,6 +1,17 @@
 {
   "customGames": [],
-  "enabledGameIds": [],
+  "enabledGameIds": [
+    "roblox",
+    "fortnite",
+    "overwatch-2",
+    "rocket-league",
+    "dota-2",
+    "counter-strike-2",
+    "league-of-legends",
+    "valorant",
+    "minecraft",
+    "hollow-knight"
+  ],
   "previouslyWonGames": [],
   "activeTheme": "cyber-arcade"
 }

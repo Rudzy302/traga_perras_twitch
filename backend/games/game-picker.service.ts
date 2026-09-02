@@ -19,6 +19,7 @@ export interface GamePickerState {
   votedGames: VotedGameSummary[];
   previouslyWonGames: string[];
   enabledGameIds: string[];
+  enabledGames: { id: string; name: string; category: string; platform?: string }[];
   winningGame: {
     id: string;
     name: string;
@@ -486,6 +487,16 @@ export class GamePickerService {
 
   public getState(): GamePickerState {
     const summaries = this.getVotedSummaries();
+    const all = this.getAllCatalogGames();
+    const enabledGamesList = all
+      .filter((g) => this.enabledGameIds.has(g.id))
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        category: g.category,
+        platform: g.platform,
+      }));
+
     return {
       votingState: this.votingState,
       duration: this.duration,
@@ -494,6 +505,7 @@ export class GamePickerService {
       votedGames: summaries,
       previouslyWonGames: Array.from(this.previouslyWonGames),
       enabledGameIds: Array.from(this.enabledGameIds),
+      enabledGames: enabledGamesList,
       winningGame: this.winningGame,
       activeTheme: this.activeTheme,
     };
