@@ -47,45 +47,59 @@ let GamePickerService = GamePickerService_1 = class GamePickerService {
         this.onBroadcastSpinStarted = null;
         this.loadConfig();
     }
+    getCandidateFilePaths(fileName) {
+        return [
+            path.resolve(process.cwd(), fileName),
+            path.resolve(process.cwd(), 'backend', fileName),
+            path.resolve(__dirname, '..', '..', fileName),
+            path.resolve(__dirname, '..', fileName),
+        ];
+    }
     loadConfig() {
-        try {
-            if (fs.existsSync(this.configPath)) {
-                const data = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
-                if (Array.isArray(data.customGames))
-                    this.customGames = data.customGames;
-                if (Array.isArray(data.deletedGameIds))
-                    this.deletedGameIds = new Set(data.deletedGameIds);
-                if (Array.isArray(data.enabledGameIds))
-                    this.enabledGameIds = new Set(data.enabledGameIds);
-                if (Array.isArray(data.previouslyWonGames))
-                    this.previouslyWonGames = new Set(data.previouslyWonGames);
-                if (data.activeTheme)
-                    this.activeTheme = data.activeTheme;
-                this.logger.log(`Configuración de Selectora de Juegos cargada (${this.enabledGameIds.size} juegos habilitados).`);
+        let loaded = false;
+        for (const p of this.getCandidateFilePaths('game_picker_config.json')) {
+            if (fs.existsSync(p)) {
+                try {
+                    const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+                    if (Array.isArray(data.customGames))
+                        this.customGames = data.customGames;
+                    if (Array.isArray(data.deletedGameIds))
+                        this.deletedGameIds = new Set(data.deletedGameIds);
+                    if (Array.isArray(data.enabledGameIds))
+                        this.enabledGameIds = new Set(data.enabledGameIds);
+                    if (Array.isArray(data.previouslyWonGames))
+                        this.previouslyWonGames = new Set(data.previouslyWonGames);
+                    if (data.activeTheme)
+                        this.activeTheme = data.activeTheme;
+                    this.logger.log(`📂 [Config Cargada de Selectora]: ${p} (${this.enabledGameIds.size} habilitados, ${this.customGames.length} custom, ${this.deletedGameIds.size} eliminados).`);
+                    loaded = true;
+                    break;
+                }
+                catch (err) {
+                    this.logger.error(`Error al leer ${p}`, err);
+                }
             }
         }
-        catch (err) {
-            this.logger.error('Error al cargar game_picker_config.json', err);
-        }
-        if (this.enabledGameIds.size === 0) {
+        if (!loaded || this.enabledGameIds.size === 0) {
             const defaultIds = ['minecraft', 'roblox', 'fortnite', 'lethal-company', 'phasmophobia', 'valorant', 'gta-v', 'fall-guys'];
             defaultIds.forEach((id) => this.enabledGameIds.add(id));
             this.saveConfig();
         }
     }
     saveConfig() {
-        try {
-            const data = {
-                customGames: this.customGames,
-                deletedGameIds: Array.from(this.deletedGameIds),
-                enabledGameIds: Array.from(this.enabledGameIds),
-                previouslyWonGames: Array.from(this.previouslyWonGames),
-                activeTheme: this.activeTheme,
-            };
-            fs.writeFileSync(this.configPath, JSON.stringify(data, null, 2), 'utf8');
-        }
-        catch (err) {
-            this.logger.error('Error al guardar game_picker_config.json', err);
+        const data = {
+            customGames: this.customGames,
+            deletedGameIds: Array.from(this.deletedGameIds),
+            enabledGameIds: Array.from(this.enabledGameIds),
+            previouslyWonGames: Array.from(this.previouslyWonGames),
+            activeTheme: this.activeTheme,
+        };
+        const jsonString = JSON.stringify(data, null, 2);
+        for (const p of this.getCandidateFilePaths('game_picker_config.json')) {
+            try {
+                fs.writeFileSync(p, jsonString, 'utf8');
+            }
+            catch { }
         }
     }
     getAllCatalogGames() {

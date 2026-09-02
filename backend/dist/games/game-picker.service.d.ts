@@ -47,6 +47,7 @@ export declare class GamePickerService {
     onBroadcastState: ((state: GamePickerState) => void) | null;
     onBroadcastSpinStarted: ((payload: any) => void) | null;
     constructor();
+    private getCandidateFilePaths;
     private loadConfig;
     private saveConfig;
     getAllCatalogGames(): GameEntry[];
