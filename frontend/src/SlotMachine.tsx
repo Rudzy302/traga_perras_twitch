@@ -18,7 +18,8 @@ export type SlotTheme =
   | 'ice-frost'
   | 'vaporwave-sunset'
   | 'steampunk-brass'
-  | 'galactic-void';
+  | 'galactic-void'
+  | 'halloween-spooky';
 
 export interface ThemeMeta {
   id: SlotTheme;
@@ -39,6 +40,15 @@ export const THEMES_LIST: ThemeMeta[] = [
     headerIcon: '🎪',
     colorPreview: 'linear-gradient(135deg, #073a21, #0f7544 50%, #ffd700)',
     tag: 'DEFAULT FEST',
+  },
+  {
+    id: 'halloween-spooky',
+    name: 'Halloween Spooky 🎃',
+    subtitle: 'Calabazas ardientes, niebla espectral púrpura y verde ectoplasma',
+    icon: '🎃',
+    headerIcon: '🎃',
+    colorPreview: 'linear-gradient(135deg, #180928, #ff6600 50%, #00ff66)',
+    tag: 'ESPECIAL OCTUBRE',
   },
   {
     id: 'gold-classic',
