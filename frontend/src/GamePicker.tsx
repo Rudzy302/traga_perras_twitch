@@ -330,7 +330,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
           {/* Mira central de selección con deflexión física en cada tick */}
           <div className={`gp-center-pointer top-pointer ${needleActive ? 'needle-tick-active' : ''}`}>▼</div>
           <div className={`gp-center-pointer bottom-pointer ${needleActive ? 'needle-tick-active' : ''}`}>▲</div>
-          <div className="gp-center-target-line"></div>
+          <div className={`gp-center-target-line ${pickerState.votingState === 'WINNER' ? 'target-line-winner' : ''}`}></div>
 
           {/* Si está girando o mostrando ganador, renderizamos el carrusel horizontal */}
           {(pickerState.votingState === 'SPINNING' || pickerState.votingState === 'WINNER') && (
@@ -344,9 +344,15 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
                 }}
               >
                 {spinItems.map((item, idx) => {
-                  const isWinnerCard = pickerState.votingState === 'WINNER' && idx === winnerCardIndex && !isSpinningLocal;
+                  const isWinnerCard =
+                    (pickerState.votingState === 'WINNER' || !isSpinningLocal) &&
+                    idx === winnerCardIndex &&
+                    Boolean(pickerState.winningGame);
+
                   return (
                     <div key={idx} className={`gp-game-card ${isWinnerCard ? 'winner-card-glow' : ''}`}>
+                      {/* Diente/Pasador físico izquierdo que golpea la aguja */}
+                      <div className="gp-card-left-peg"></div>
                       <div className="gp-card-glow-border"></div>
                       <div className="gp-card-icon">{isWinnerCard ? '🏆' : '🎮'}</div>
                       <div className="gp-card-title">{item.name}</div>
