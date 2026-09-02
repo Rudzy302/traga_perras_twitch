@@ -57,14 +57,62 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   const [spinItems, setSpinItems] = useState<VotedGameSummary[]>([]);
   const [isSpinningLocal, setIsSpinningLocal] = useState<boolean>(false);
   const [targetOffset, setTargetOffset] = useState<number>(0);
-  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(120);
+  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(280);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
 
   const viewportFrameRef = useRef<HTMLDivElement>(null);
   const reelContainerRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  // Helper para obtener AudioContext
+  const getAudioContext = () => {
+    try {
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) audioContextRef.current = new AudioCtx();
+      }
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+      return audioContextRef.current;
+    } catch {
+      return null;
+    }
+  };
+
+  // Sonido de "TAC" mecánico de la aguja golpeando el divisor de casilla
+  const playNeedleTick = () => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      // Ruido percusivo de aguja plástica / madera ("TAC" seco)
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(680, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(70, ctx.currentTime + 0.015);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400, ctx.currentTime);
+      filter.Q.setValueAtTime(3.0, ctx.currentTime);
+
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.015);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.016);
+    } catch {}
+  };
 
   // Helper para construir la cinta de tarjetas garantizando al ganador en la posición exacta
-  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 150, winnerIdx = 120): VotedGameSummary[] => {
+  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 350, winnerIdx = 280): VotedGameSummary[] => {
     const safePool: VotedGameSummary[] =
       pool && pool.length > 0
         ? pool
@@ -95,8 +143,8 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   useEffect(() => {
     if (!socket) return;
 
-    const WINNER_INDEX = 120;
-    const TOTAL_CARDS = 150;
+    const WINNER_INDEX = 280;
+    const TOTAL_CARDS = 350;
 
     // Pedir estado inicial
     socket.emit('get-game-picker-state', (state: GamePickerState) => {
@@ -158,11 +206,39 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         setTargetOffset(finalOffset);
       }, 50);
 
-      // Temporizador visual del giro cinético de 20 segundos
-      const totalDuration = payload.durationMs || 20000;
-      setTimeout(() => {
-        setIsSpinningLocal(false);
-      }, totalDuration);
+      // FÍSICA DE SONIDO: Clacs de aguja reduciéndose gradualmente a lo largo de 60 segundos
+      const startTime = Date.now();
+      const totalDuration = payload.durationMs || 60000;
+
+      const scheduleNextTick = () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= totalDuration) {
+          setIsSpinningLocal(false);
+          return;
+        }
+
+        const progress = elapsed / totalDuration; // 0.0 -> 1.0
+
+        playNeedleTick();
+
+        // Desaceleración progresiva y realista simulando el paso de casillas bajo la aguja:
+        let nextDelay = 30;
+        if (progress < 0.35) {
+          nextDelay = 25 + progress * 50; // 0s - 21s: Híper velocidad (tac-tac-tac-tac)
+        } else if (progress < 0.60) {
+          nextDelay = 45 + (progress - 0.35) * 350; // 21s - 36s: Empieza a reducir velocidad
+        } else if (progress < 0.80) {
+          nextDelay = 135 + (progress - 0.60) * 1200; // 36s - 48s: Casillas claramente audibles
+        } else if (progress < 0.93) {
+          nextDelay = 380 + (progress - 0.80) * 3500; // 48s - 55.8s: Suspenso con tacs espaciados
+        } else {
+          nextDelay = 850 + (progress - 0.93) * 12000; // 55.8s - 60s: Últimos 4 tacs dramáticos hasta frenar
+        }
+
+        setTimeout(scheduleNextTick, nextDelay);
+      };
+
+      scheduleNextTick();
     };
 
     socket.on('game-picker-state', handleStateChange);
@@ -250,7 +326,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
                 className={`gp-reel-strip ${isSpinningLocal ? 'is-spinning-active' : ''}`}
                 style={{
                   transform: `translateX(-${targetOffset}px)`,
-                  transition: isSpinningLocal ? 'transform 20s cubic-bezier(0.05, 0.88, 0.1, 1)' : 'none',
+                  transition: isSpinningLocal ? 'transform 60s cubic-bezier(0.04, 0.85, 0.1, 1)' : 'none',
                 }}
               >
                 {spinItems.map((item, idx) => {
