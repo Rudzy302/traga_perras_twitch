@@ -136,13 +136,14 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
   }
 
   private autoCleanupInterval: NodeJS.Timeout | null = null;
+  private activeMessageTimers = new Map<string, NodeJS.Timeout>();
 
   private startAutoCleanupTask() {
     if (this.autoCleanupInterval) {
       clearInterval(this.autoCleanupInterval);
     }
 
-    this.autoCleanupInterval = setInterval(async () => {
+    this.autoCleanupInterval = setInterval(() => {
       const now = Date.now();
 
       // 1. Limpieza de memoria de usuarios recientes (> 60 segundos)
@@ -157,18 +158,29 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
         this.lastConsecutiveUser = null;
         this.consecutiveSpinsCount = 0;
       }
+    }, 60000);
+  }
 
-      // 3. Limpieza de mensajes del chat de Twitch para liberar carga
-      if (this.client && this.isAuthenticated && this.currentChannel.trim() !== '') {
+  /**
+   * Programa la eliminación individual de un mensaje/log tras 1 minuto (60 segundos) exactos
+   */
+  public scheduleIndividualMessageDeletion(channel: string, msgId: string): void {
+    if (!msgId || this.activeMessageTimers.has(msgId)) return;
+
+    const timer = setTimeout(async () => {
+      this.activeMessageTimers.delete(msgId);
+      if (this.client && this.isAuthenticated) {
         try {
-          const cleanChan = this.currentChannel.replace(/^#/, '');
-          await this.client.say(cleanChan, '/clear');
-          this.logger.log(`🧹 [Auto-Limpieza Cada 1 Min]: Chat #${cleanChan} limpiado con /clear para liberar carga.`);
+          const cleanChan = channel.replace(/^#/, '');
+          await this.client.say(cleanChan, `/delete ${msgId}`);
+          this.logger.log(`🧹 [Log Expirado a los 60s]: Mensaje ${msgId} eliminado individualmente del chat.`);
         } catch (e) {
-          this.logger.debug(`ℹ️ Auto-limpieza en chat omitida o sin permisos de mod: ${e}`);
+          this.logger.debug(`ℹ️ No se pudo borrar mensaje individual ${msgId}: ${e}`);
         }
       }
-    }, 60000);
+    }, 60000); // 1 minuto de vida útil por mensaje
+
+    this.activeMessageTimers.set(msgId, timer);
   }
 
   async onModuleDestroy() {
@@ -176,6 +188,10 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.autoCleanupInterval);
       this.autoCleanupInterval = null;
     }
+    for (const timer of this.activeMessageTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.activeMessageTimers.clear();
     await this.disconnectFromTwitch();
   }
 
@@ -368,6 +384,15 @@ export class TwitchService implements OnModuleInit, OnModuleDestroy {
       this.client = new tmi.Client(clientOptions);
 
       this.client.on('message', (channel, tags, message, self) => {
+        // Si el mensaje proviene del bot o de comandos automáticos, programar su borrado individual a los 60s
+        const sender = (tags['display-name'] || tags.username || '').toLowerCase();
+        const botNick = (this.currentBotUsername || this.currentChannel).toLowerCase().replace(/^@/, '');
+        const msgId = tags['id'];
+
+        if ((self || sender === botNick) && msgId) {
+          this.scheduleIndividualMessageDeletion(channel, msgId);
+        }
+
         this.handleChatMessage(channel, tags, message);
       });
 

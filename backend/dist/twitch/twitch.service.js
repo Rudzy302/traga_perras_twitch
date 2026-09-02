@@ -72,6 +72,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
         this.consecutiveSpinsCount = 0;
         this.MAX_CONSECUTIVE_SPINS = 2;
         this.autoCleanupInterval = null;
+        this.activeMessageTimers = new Map();
         this.cooldownTimers = [];
     }
     async onModuleInit() {
@@ -100,7 +101,7 @@ let TwitchService = TwitchService_1 = class TwitchService {
         if (this.autoCleanupInterval) {
             clearInterval(this.autoCleanupInterval);
         }
-        this.autoCleanupInterval = setInterval(async () => {
+        this.autoCleanupInterval = setInterval(() => {
             const now = Date.now();
             for (const [user, timestamp] of this.recentSpinUsers.entries()) {
                 if (now - timestamp > 60000) {
@@ -111,23 +112,35 @@ let TwitchService = TwitchService_1 = class TwitchService {
                 this.lastConsecutiveUser = null;
                 this.consecutiveSpinsCount = 0;
             }
-            if (this.client && this.isAuthenticated && this.currentChannel.trim() !== '') {
+        }, 60000);
+    }
+    scheduleIndividualMessageDeletion(channel, msgId) {
+        if (!msgId || this.activeMessageTimers.has(msgId))
+            return;
+        const timer = setTimeout(async () => {
+            this.activeMessageTimers.delete(msgId);
+            if (this.client && this.isAuthenticated) {
                 try {
-                    const cleanChan = this.currentChannel.replace(/^#/, '');
-                    await this.client.say(cleanChan, '/clear');
-                    this.logger.log(`🧹 [Auto-Limpieza Cada 1 Min]: Chat #${cleanChan} limpiado con /clear para liberar carga.`);
+                    const cleanChan = channel.replace(/^#/, '');
+                    await this.client.say(cleanChan, `/delete ${msgId}`);
+                    this.logger.log(`🧹 [Log Expirado a los 60s]: Mensaje ${msgId} eliminado individualmente del chat.`);
                 }
                 catch (e) {
-                    this.logger.debug(`ℹ️ Auto-limpieza en chat omitida o sin permisos de mod: ${e}`);
+                    this.logger.debug(`ℹ️ No se pudo borrar mensaje individual ${msgId}: ${e}`);
                 }
             }
         }, 60000);
+        this.activeMessageTimers.set(msgId, timer);
     }
     async onModuleDestroy() {
         if (this.autoCleanupInterval) {
             clearInterval(this.autoCleanupInterval);
             this.autoCleanupInterval = null;
         }
+        for (const timer of this.activeMessageTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.activeMessageTimers.clear();
         await this.disconnectFromTwitch();
     }
     getCandidateFilePaths(fileName) {
@@ -277,6 +290,12 @@ let TwitchService = TwitchService_1 = class TwitchService {
         try {
             this.client = new tmi.Client(clientOptions);
             this.client.on('message', (channel, tags, message, self) => {
+                const sender = (tags['display-name'] || tags.username || '').toLowerCase();
+                const botNick = (this.currentBotUsername || this.currentChannel).toLowerCase().replace(/^@/, '');
+                const msgId = tags['id'];
+                if ((self || sender === botNick) && msgId) {
+                    this.scheduleIndividualMessageDeletion(channel, msgId);
+                }
                 this.handleChatMessage(channel, tags, message);
             });
             this.client.on('connected', (addr, port) => {

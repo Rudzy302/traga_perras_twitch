@@ -40,7 +40,9 @@ export declare class TwitchService implements OnModuleInit, OnModuleDestroy {
     constructor(casinoGateway: CasinoGateway, gamePickerService: GamePickerService);
     onModuleInit(): Promise<void>;
     private autoCleanupInterval;
+    private activeMessageTimers;
     private startAutoCleanupTask;
+    scheduleIndividualMessageDeletion(channel: string, msgId: string): void;
     onModuleDestroy(): Promise<void>;
     private getCandidateFilePaths;
     saveConfigToDisk(data: {
