@@ -258,7 +258,7 @@ export class GamePickerService {
       votedBy: winnerSummary.voters,
     };
 
-    this.logger.log(`Giro de Selectora iniciado (15 segundos). Ganador calculado: ${this.winningGame.name}`);
+    this.logger.log(`Giro de Selectora iniciado (20 segundos de suspenso). Ganador calculado: ${this.winningGame.name}`);
 
     // Mensaje de cierre en Twitch
     if (this.onSendMessageToChat) {
@@ -268,7 +268,7 @@ export class GamePickerService {
     // Emitir inicio de giro a OBS y Dashboard
     if (this.onBroadcastSpinStarted) {
       this.onBroadcastSpinStarted({
-        durationMs: 15000,
+        durationMs: 20000,
         votedPool: poolToSpin,
         winner: this.winningGame,
       });
@@ -276,10 +276,10 @@ export class GamePickerService {
 
     this.broadcastCurrentState();
 
-    // Fase 3: A los 15 segundos, anunciar ganador
+    // Fase 3: A los 20 segundos de giro completo, anunciar ganador
     this.lifecycleTimer = setTimeout(() => {
       this.announceWinnerSequence();
-    }, 15000);
+    }, 20000);
   }
 
   private announceWinnerSequence() {

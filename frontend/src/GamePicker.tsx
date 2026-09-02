@@ -57,7 +57,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   const [spinItems, setSpinItems] = useState<VotedGameSummary[]>([]);
   const [isSpinningLocal, setIsSpinningLocal] = useState<boolean>(false);
   const [targetOffset, setTargetOffset] = useState<number>(0);
-  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(50);
+  const [winnerCardIndex, setWinnerCardIndex] = useState<number>(120);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
 
   const viewportFrameRef = useRef<HTMLDivElement>(null);
@@ -80,56 +80,39 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
     }
   };
 
-  // Sonido de clic mecánico auténtico (Salto de casilla con impacto táctil)
-  const playMechanicalTick = (pitchMultiplier = 1.0) => {
+  // Sonido ÚNICO: Click mecánico puro de salto de casilla (sin tonos ni sintetizadores)
+  const playCardStepTick = () => {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
 
+      // Ruido percusivo de clic de tarjeta mecánico
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(420 * pitchMultiplier, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(70 * pitchMultiplier, ctx.currentTime + 0.045);
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(75, ctx.currentTime + 0.022);
 
-      gain.gain.setValueAtTime(0.35, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.045);
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1150, ctx.currentTime);
+      filter.Q.setValueAtTime(2.5, ctx.currentTime);
 
-      osc.connect(gain);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.022);
+
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start();
-      osc.stop(ctx.currentTime + 0.048);
-    } catch {}
-  };
-
-  // Sonido de freno / parada en seco sobre la casilla ganadora
-  const playHardStopSound = () => {
-    try {
-      const ctx = getAudioContext();
-      if (!ctx) return;
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(160, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.35);
-
-      gain.gain.setValueAtTime(0.85, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.36);
+      osc.stop(ctx.currentTime + 0.024);
     } catch {}
   };
 
   // Helper para construir la cinta de tarjetas garantizando al ganador en la posición exacta
-  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 80, winnerIdx = 50): VotedGameSummary[] => {
+  const buildReelItems = (winner: any, pool: VotedGameSummary[], totalCount = 150, winnerIdx = 120): VotedGameSummary[] => {
     const safePool: VotedGameSummary[] =
       pool && pool.length > 0
         ? pool
@@ -160,18 +143,19 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
   useEffect(() => {
     if (!socket) return;
 
-    const WINNER_INDEX = 50;
+    const WINNER_INDEX = 120;
+    const TOTAL_CARDS = 150;
 
     // Pedir estado inicial
     socket.emit('get-game-picker-state', (state: GamePickerState) => {
       if (state) {
         setPickerState(state);
         if (state.votingState === 'WINNER' && state.winningGame) {
-          const list = buildReelItems(state.winningGame, state.votedGames, 80, WINNER_INDEX);
+          const list = buildReelItems(state.winningGame, state.votedGames, TOTAL_CARDS, WINNER_INDEX);
           setSpinItems(list);
           setWinnerCardIndex(WINNER_INDEX);
           const vpWidth = viewportFrameRef.current?.clientWidth || 700;
-          const offset = WINNER_INDEX * 256 + 120 - vpWidth / 2;
+          const offset = Math.round(WINNER_INDEX * 256 + 120 - vpWidth / 2);
           setTargetOffset(offset);
           setShowConfetti(true);
         }
@@ -181,13 +165,14 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
     const handleStateChange = (state: GamePickerState) => {
       setPickerState(state);
       if (state.votingState === 'WINNER') {
+        setIsSpinningLocal(false);
         setShowConfetti(true);
         if (state.winningGame) {
-          const list = buildReelItems(state.winningGame, state.votedGames, 80, WINNER_INDEX);
+          const list = buildReelItems(state.winningGame, state.votedGames, TOTAL_CARDS, WINNER_INDEX);
           setSpinItems(list);
           setWinnerCardIndex(WINNER_INDEX);
           const vpWidth = viewportFrameRef.current?.clientWidth || 700;
-          const offset = WINNER_INDEX * 256 + 120 - vpWidth / 2;
+          const offset = Math.round(WINNER_INDEX * 256 + 120 - vpWidth / 2);
           setTargetOffset(offset);
         }
       } else if (state.votingState === 'IDLE') {
@@ -203,7 +188,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       const winnerIdx = WINNER_INDEX;
       setWinnerCardIndex(winnerIdx);
 
-      const list = buildReelItems(payload.winner, payload.votedPool, 80, winnerIdx);
+      const list = buildReelItems(payload.winner, payload.votedPool, TOTAL_CARDS, winnerIdx);
       setSpinItems(list);
 
       // Calcular el desplazamiento en píxeles
@@ -211,7 +196,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
       // Centro de tarjeta = winnerIdx * 256 + 120px
       // Para alinear con centro de viewport (vpWidth / 2): offset = centerCard - vpWidth/2
       const vpWidth = viewportFrameRef.current?.clientWidth || 700;
-      const finalOffset = winnerIdx * 256 + 120 - vpWidth / 2;
+      const finalOffset = Math.round(winnerIdx * 256 + 120 - vpWidth / 2);
 
       // Resetear posición primero
       setTargetOffset(0);
@@ -221,33 +206,31 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         setTargetOffset(finalOffset);
       }, 50);
 
-      // FÍSICA DE SONIDO: Ticks mecánicos a lo largo de 15 segundos
+      // FÍSICA DE SONIDO: Ticks mecánicos de salto de casilla a lo largo de 20 segundos
       const startTime = Date.now();
-      const totalDuration = payload.durationMs || 15000;
+      const totalDuration = payload.durationMs || 20000;
 
       const scheduleNextTick = () => {
         const elapsed = Date.now() - startTime;
         if (elapsed >= totalDuration) {
-          playHardStopSound();
+          setIsSpinningLocal(false);
           return;
         }
 
         const progress = elapsed / totalDuration; // 0.0 -> 1.0
 
-        // Tono desciende levemente con la inercia (1.3 -> 0.75)
-        const pitch = 1.3 - progress * 0.55;
-        playMechanicalTick(pitch);
+        playCardStepTick();
 
         // Desaceleración progresiva de los saltos de casilla:
         let nextDelay = 30;
         if (progress < 0.35) {
-          nextDelay = 25 + progress * 60; // 0s - 5.2s: Híper velocidad
+          nextDelay = 26 + progress * 60; // 0s - 7s: Híper velocidad
         } else if (progress < 0.65) {
-          nextDelay = 45 + (progress - 0.35) * 320; // 5.2s - 9.7s: Frenada visible
+          nextDelay = 48 + (progress - 0.35) * 320; // 7s - 13s: Frenada visible
         } else if (progress < 0.88) {
-          nextDelay = 145 + (progress - 0.65) * 950; // 9.7s - 13.2s: Salto de casilla audible y tenso
+          nextDelay = 145 + (progress - 0.65) * 1100; // 13s - 17.6s: Salto de casilla audible y tenso
         } else {
-          nextDelay = 360 + (progress - 0.88) * 3200; // 13.2s - 15s: Últimos saltos hasta el ganador
+          nextDelay = 380 + (progress - 0.88) * 4200; // 17.6s - 20s: Últimos saltos lentos hasta detenerse en el ganador
         }
 
         setTimeout(scheduleNextTick, nextDelay);
@@ -341,11 +324,11 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
                 className={`gp-reel-strip ${isSpinningLocal ? 'is-spinning-active' : ''}`}
                 style={{
                   transform: `translateX(-${targetOffset}px)`,
-                  transition: isSpinningLocal ? 'transform 15s cubic-bezier(0.04, 0.9, 0.1, 1)' : 'none',
+                  transition: isSpinningLocal ? 'transform 20s cubic-bezier(0.05, 0.88, 0.1, 1)' : 'none',
                 }}
               >
                 {spinItems.map((item, idx) => {
-                  const isWinnerCard = pickerState.votingState === 'WINNER' && idx === winnerCardIndex;
+                  const isWinnerCard = pickerState.votingState === 'WINNER' && idx === winnerCardIndex && !isSpinningLocal;
                   return (
                     <div key={idx} className={`gp-game-card ${isWinnerCard ? 'winner-card-glow' : ''}`}>
                       <div className="gp-card-glow-border"></div>
@@ -394,8 +377,8 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
           )}
         </div>
 
-        {/* CARTEL DE CELEBRACIÓN DE GANADOR (FASE 3) */}
-        {pickerState.votingState === 'WINNER' && pickerState.winningGame && (
+        {/* CARTEL DE CELEBRACIÓN DE GANADOR (FASE 3: Solo una vez que la máquina se ha detenido por completo) */}
+        {pickerState.votingState === 'WINNER' && !isSpinningLocal && pickerState.winningGame && (
           <div className="gp-winner-announcement-overlay">
             <div className="gp-winner-trophy">🏆</div>
             <div className="gp-winner-label">¡EL JUEGO GANADOR ES!</div>
@@ -411,7 +394,7 @@ export const GamePicker: React.FC<GamePickerProps> = ({ socket, isOverlay = fals
         )}
 
         {/* Efecto de confeti visual en pantalla */}
-        {showConfetti && (
+        {showConfetti && !isSpinningLocal && (
           <div className="gp-confetti-container">
             {Array.from({ length: 40 }).map((_, i) => (
               <div
